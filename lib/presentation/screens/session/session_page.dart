@@ -2,26 +2,22 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_easylogger/flutter_logger.dart';
 import 'package:gap/gap.dart';
-import 'package:geolocator/geolocator.dart';
 import 'package:get/get.dart';
-import 'package:go_router/go_router.dart';
 import 'package:qr_code_scanner/qr_code_scanner.dart';
-import 'package:tdtime/domain/models/hystory_sessions.dart';
 import 'package:tdtime/presentation/screens/main/bloc/main_bloc.dart';
-import 'package:tdtime/presentation/screens/main/get_position.dart';
 import 'package:tdtime/presentation/screens/main/widget.dart';
 import 'package:tdtime/presentation/screens/scan/qr_code_scan.dart';
 import 'package:tdtime/presentation/theme/theme.dart';
 import 'package:tdtime/presentation/widgets/app_bar.dart';
 import 'package:tdtime/presentation/widgets/buttons.dart';
 
-class MainScanPage extends StatefulWidget {
-  const MainScanPage({Key? key}) : super(key: key);
+class DataMatrixScanPage extends StatefulWidget {
+  const DataMatrixScanPage({Key? key}) : super(key: key);
   @override
-  State<MainScanPage> createState() => MainScanPageState();
+  State<DataMatrixScanPage> createState() => DataMatrixScanPageState();
 }
 
-class MainScanPageState extends State<MainScanPage> {
+class DataMatrixScanPageState extends State<DataMatrixScanPage> {
   final GlobalKey qrKey = GlobalKey(debugLabel: 'QR');
   MainBloc bloc = Get.find<MainBloc>();
   QRViewController? controller;
@@ -34,22 +30,15 @@ class MainScanPageState extends State<MainScanPage> {
   }
 
   @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    StateSession state = bloc.state.curHystorySession.state;
-    if (state != StateSession.close && state != StateSession.create) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        context.go('/main/matrix');
-      });
-    }
-  }
-
-  @override
   void dispose() {
     controller?.dispose();
     super.dispose();
   }
 
+  /// закрытие сессии
+  void closeSession() {}
+
+  /// начало сканирования дата матрикс
   void startScanning() async {
     await Navigator.push(
       context,
@@ -61,25 +50,22 @@ class MainScanPageState extends State<MainScanPage> {
 
     if (result.code == null) {
       error = 'Ошибка сканирования';
+      setState(() {});
     } else {
-      isLoading = true;
-      setState(() {});
-      Position position = await determinePosition();
-      isLoading = false;
-      setState(() {});
-      Logger.i('result >>. ${result.code} === ${position.toJson()}');
-      bloc.add(BeginSessinonEvent(id: result.code!, position: position));
-      await Future.delayed(const Duration(milliseconds: 300));
-      if (bloc.state.error.isEmpty && error.isEmpty) {
-        if (mounted) {
-          context.go('/main/matrix');
-        }
-      }
+      if (result.format != BarcodeFormat.dataMatrix) {
+        error = 'Это не  DataMatrix формат!';
+        setState(() {});
+      } else {
+        Logger.i('result >>. ${result.code} === ${result.format}');
 
-      await Future.delayed(const Duration(seconds: 6));
-      error = '';
-      setState(() {});
+        bloc.add(AddMatrixEvent(id: result.code!));
+        await Future.delayed(const Duration(milliseconds: 300));
+        if (bloc.state.error.isEmpty && error.isEmpty) {}
+      }
     }
+    await Future.delayed(const Duration(seconds: 8));
+    error = '';
+    setState(() {});
   }
 
   @override
@@ -93,9 +79,7 @@ class MainScanPageState extends State<MainScanPage> {
           return Scaffold(
             extendBodyBehindAppBar: true,
             appBar: AppBars(
-              title: state.curHystorySession.listSessions.isEmpty
-                  ? 'Сканирование'
-                  : 'История сессий',
+              title: 'Сессия №${state.curSession.id}',
               isBack: false,
               isLeft: true,
             ),
@@ -113,9 +97,10 @@ class MainScanPageState extends State<MainScanPage> {
                           child: Column(
                             children: [
                               const Gap(70),
-                              ...state.curHystorySession.listSessions.reversed
+                              ...state.curHystorySession.listSessions.last
+                                  .dataMatrix.reversed
                                   .map(
-                                (e) => ItemSession(item: e),
+                                (e) => ItemSession(title: e),
                               )
                             ],
                           ),
@@ -127,13 +112,23 @@ class MainScanPageState extends State<MainScanPage> {
                   child: Column(
                     children: [
                       ButtonWide(
-                        text: 'Начать новую сессию',
+                        text: 'Сканировать DataMatrix',
                         iconPath: 'assets/svg/reader.svg',
                         onPressed: startScanning,
                       ),
-                      const Gap(5),
+                      if (state.curHystorySession.listSessions.isNotEmpty &&
+                          state.curHystorySession.listSessions.last.dataMatrix
+                              .isNotEmpty) ...[
+                        const Gap(15),
+                        ButtonWide(
+                          text: 'Закрыть сессию',
+                          iconPath: 'assets/svg/reader.svg',
+                          onPressed: closeSession,
+                        ),
+                      ],
+                      const Gap(10),
                       SizedBox(
-                        height: 20,
+                        height: 30,
                         child: (state.error.isNotEmpty || error.isNotEmpty)
                             ? Text(
                                 state.error.isNotEmpty ? state.error : error,

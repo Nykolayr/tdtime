@@ -30,9 +30,18 @@ class MainState extends Equatable {
   factory MainState.initial() => MainState(
         isLoading: false,
         error: '',
-        curSession:
-            Get.find<UserRepository>().hystorySessions.last.listSessions.last,
-        curHystorySession: Get.find<UserRepository>().hystorySessions.last,
+        curSession: (Get.find<UserRepository>().hystorySessions.isNotEmpty &&
+                Get.find<UserRepository>()
+                    .hystorySessions
+                    .last
+                    .listSessions
+                    .isNotEmpty)
+            ? Get.find<UserRepository>().hystorySessions.last.listSessions.last
+            : SessionScan.init(),
+        curHystorySession:
+            (Get.find<UserRepository>().hystorySessions.isNotEmpty)
+                ? Get.find<UserRepository>().hystorySessions.last
+                : HystorySessions.init(),
       );
 
   @override

@@ -33,7 +33,11 @@ class UserRepository extends GetxController {
   Future init() async {
     // LocalData().clear();
     await loadUserFromLocal();
-    await loadHystorySessionsFromLocal();
+    try {
+      await loadHystorySessionsFromLocal();
+    } catch (e) {
+      Logger.e('errror loadHystorySessionsFromLocal $e');
+    }
   }
 
   /// Добавление сессии в историю
@@ -63,9 +67,10 @@ class UserRepository extends GetxController {
   /// Добавление DataMatrix в сессию
   String addMatrix({required String id}) {
     if (hystorySessions.last.listSessions.last.dataMatrix.contains(id)) {
-      return 'Этот  DataMatrix вы уже сканировали!';
+      return 'Этот DataMatrix вы уже сканировали!';
     } else {
       hystorySessions.last.listSessions.last.dataMatrix.add(id);
+      hystorySessions.last.state = StateSession.inwork;
       saveHystorySessionsToLocal();
     }
     return '';
@@ -75,6 +80,10 @@ class UserRepository extends GetxController {
   Future clearUser() async {
     await LocalData().clear();
     user = User.initial();
+    hystorySessions = [];
+    SessionScan.init();
+    curHystorySession = HystorySessions.init();
+    saveHystorySessionsToLocal();
   }
 
   /// авторизация пользователя

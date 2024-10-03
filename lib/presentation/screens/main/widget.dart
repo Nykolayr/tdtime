@@ -78,10 +78,12 @@ class EmptySession extends StatelessWidget {
 
 /// виджет сессии
 class ItemSession extends StatelessWidget {
-  final SessionScan item;
+  final SessionScan? item;
+  final String title;
   const ItemSession({
     Key? key,
-    required this.item,
+    this.item,
+    this.title = '',
   }) : super(key: key);
 
   @override
@@ -100,8 +102,14 @@ class ItemSession extends StatelessWidget {
         children: [
           SvgPicture.asset('assets/svg/reader.svg', width: 18),
           const Gap(7),
-          Text('Сессия от ${item.getDate()} №${item.id}',
-              style: AppText.text14b.copyWith(color: AppColor.white)),
+          Expanded(
+            child: Text(
+                (item != null)
+                    ? 'Сессия от ${item!.getDate()} №${item!.id}'
+                    : title,
+                overflow: TextOverflow.ellipsis,
+                style: AppText.text14b.copyWith(color: AppColor.white)),
+          ),
         ],
       ),
     );

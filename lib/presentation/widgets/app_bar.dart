@@ -29,6 +29,7 @@ class _AppBarsState extends State<AppBars> {
         elevation: 0,
         title: Text(widget.title, style: AppText.appTitle24),
         centerTitle: !widget.isLeft,
+        automaticallyImplyLeading: false,
         leading: widget.isBack
             ? IconButton(
                 iconSize: 32,

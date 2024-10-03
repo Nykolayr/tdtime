@@ -5,6 +5,7 @@ import 'package:tdtime/presentation/screens/auth/auth_page.dart';
 import 'package:tdtime/presentation/screens/main/main_page.dart';
 import 'package:go_router/go_router.dart';
 import 'package:page_transition/page_transition.dart';
+import 'package:tdtime/presentation/screens/session/session_page.dart';
 import 'package:tdtime/presentation/screens/splash/splash.dart';
 
 /// роутер приложения
@@ -33,7 +34,6 @@ final GoRouter router = GoRouter(
         state: state,
         child: const AuthPage(),
       ),
-      routes: const [],
     ),
     GoRoute(
       name: 'Общая',
@@ -44,7 +44,18 @@ final GoRouter router = GoRouter(
         state: state,
         child: const MainPage(),
       ),
-      routes: const [],
+      routes: [
+        GoRoute(
+          name: 'data matrix',
+          path: 'matrix',
+          pageBuilder: (context, state) => buildPageWithDefaultTransition(
+            type: PageTransitionType.fade,
+            context: context,
+            state: state,
+            child: const DataMatrixScanPage(),
+          ),
+        ),
+      ],
     ),
   ],
 );
