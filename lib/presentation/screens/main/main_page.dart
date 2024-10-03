@@ -1,7 +1,6 @@
 import 'package:gap/gap.dart';
 import 'package:get/get.dart';
 import 'package:package_info_plus/package_info_plus.dart';
-import 'package:permission_handler/permission_handler.dart';
 import 'package:tdtime/presentation/screens/main/main_scan_page.dart';
 import 'package:tdtime/presentation/screens/main/setting_page.dart';
 import 'package:tdtime/presentation/screens/main/widget.dart';
@@ -33,22 +32,9 @@ class MainPageState extends State<MainPage> {
         curve: Curves.easeInOut); // Кривая анимации
   }
 
-  Future<void> getPermission() async {
-    var status = await Permission.location.request();
-    if (status.isGranted) {
-      // Разрешение предоставлено
-    } else if (status.isDenied) {
-      // Разрешение отклонено
-    } else if (status.isPermanentlyDenied) {
-      // Разрешение навсегда отклонено, нужно перенаправить пользователя в настройки
-      openAppSettings();
-    }
-  }
-
   @override
   void initState() {
     super.initState();
-    getPermission();
   }
 
   @override

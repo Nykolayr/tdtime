@@ -7,4 +7,18 @@ sealed class MainEvent extends Equatable {
   List<Object> get props => [];
 }
 
-/// добавляем путь к видео
+/// начало сессии
+class BeginSessinonEvent extends MainEvent {
+  final String id;
+  final Position position;
+  const BeginSessinonEvent({
+    required this.id,
+    required this.position,
+  });
+}
+
+/// добавление dataMatrix
+class AddMatrixEvent extends MainEvent {
+  final String id;
+  const AddMatrixEvent({required this.id});
+}

@@ -6,7 +6,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 #com.hpace.tdtime
 #ТД Время
 
-version: 0.0.2+1
+version: 0.0.3+1
 # изменить имя
 # AndroidManifest.xml (located at android/app/src/main
 # <application android:label="App Name" ...>
@@ -47,7 +47,7 @@ dependencies:
   qr_code_scanner: ^1.0.1 #https://pub.dev/packages/qr_code_scanner
   geolocator: ^13.0.1 #https://pub.dev/packages/geolocator
   ftpconnect: ^2.0.7 #https://pub.dev/packages/ftpconnect
-  permission_handler: ^11.3.1 #https://pub.dev/packages/permission_handler
+  
   
 
 dev_dependencies:

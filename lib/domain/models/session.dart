@@ -53,4 +53,9 @@ class SessionScan {
       dataMatrix: [],
     );
   }
+
+  // Метод для форматирования даты
+  String getDate() {
+    return '${time.day.toString().padLeft(2, '0')}.${time.month.toString().padLeft(2, '0')}.${time.year.toString().substring(2)}';
+  }
 }

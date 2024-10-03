@@ -3,19 +3,19 @@ import 'package:tdtime/domain/models/session.dart';
 class HystorySessions {
   List<SessionScan> listSessions;
   DateTime time;
-  bool isOut;
+  StateSession state;
 
   // Конструктор
   HystorySessions({
     required this.listSessions,
     required this.time,
-    this.isOut = false,
+    required this.state,
   });
 
   // Метод для инициализации
   factory HystorySessions.init() {
     return HystorySessions(
-        listSessions: [], time: DateTime.now(), isOut: false);
+        listSessions: [], time: DateTime.now(), state: StateSession.create);
   }
 
   // Метод для добавления сессии
@@ -28,11 +28,6 @@ class HystorySessions {
     return listSessions.length;
   }
 
-  // Метод для проверки статуса
-  bool checkIsOut() {
-    return isOut;
-  }
-
   // Метод fromJson
   factory HystorySessions.fromJson(Map<String, dynamic> json) {
     return HystorySessions(
@@ -40,7 +35,8 @@ class HystorySessions {
           .map((session) => SessionScan.fromJson(session))
           .toList(),
       time: DateTime.parse(json['time']),
-      isOut: json['isOut'] ?? false,
+      state: StateSession.values.firstWhere((e) => e.name == json['state'],
+          orElse: () => StateSession.create),
     );
   }
 
@@ -49,7 +45,7 @@ class HystorySessions {
     return {
       'listSessions': listSessions.map((session) => session.toJson()).toList(),
       'time': time.toIso8601String(),
-      'isOut': isOut,
+      'state': state.name,
     };
   }
 
@@ -57,4 +53,20 @@ class HystorySessions {
   String getDate() {
     return '${time.day.toString().padLeft(2, '0')}.${time.month.toString().padLeft(2, '0')}.${time.year.toString().substring(2)}';
   }
+}
+
+enum StateSession {
+  create,
+  open,
+  inwork,
+  inOut,
+  close;
+
+  String get title => switch (this) {
+        StateSession.create => 'Создана',
+        StateSession.open => 'Открыта',
+        StateSession.inwork => 'В работе',
+        StateSession.inOut => 'Ожидает отправки',
+        StateSession.close => 'Закрыта'
+      };
 }

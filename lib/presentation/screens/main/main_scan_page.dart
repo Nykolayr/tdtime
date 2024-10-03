@@ -3,10 +3,13 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_easylogger/flutter_logger.dart';
 import 'package:flutter_svg/svg.dart';
 import 'package:gap/gap.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:get/get.dart';
 import 'package:go_router/go_router.dart';
 import 'package:qr_code_scanner/qr_code_scanner.dart';
 import 'package:tdtime/presentation/screens/main/bloc/main_bloc.dart';
+import 'package:tdtime/presentation/screens/main/get_position.dart';
+import 'package:tdtime/presentation/screens/main/widget.dart';
 import 'package:tdtime/presentation/screens/scan/qr_code_scan.dart';
 import 'package:tdtime/presentation/theme/theme.dart';
 import 'package:tdtime/presentation/widgets/app_bar.dart';
@@ -20,8 +23,10 @@ class MainScanPage extends StatefulWidget {
 
 class MainScanPageState extends State<MainScanPage> {
   final GlobalKey qrKey = GlobalKey(debugLabel: 'QR');
+  MainBloc bloc = Get.find<MainBloc>();
   QRViewController? controller;
   String error = '';
+  bool isLoading = false;
   late Barcode result;
   @override
   void initState() {
@@ -42,73 +47,102 @@ class MainScanPageState extends State<MainScanPage> {
                 result = scanResult;
               })),
     );
-    if (!mounted) return;
-    setState(() {});
     if (result.code == null) {
       error = 'Ошибка сканирования';
     } else {
-      List<String> fio = result.code!.split(' ');
-      Logger.i('fio ${fio.length} = $fio');
-      if (fio.length != 3) {
-        error = 'Отсканированные данные не соответсвуют формату';
-      } else {
-        await Future.delayed(const Duration(milliseconds: 300));
-        // if (mounted) {
+      isLoading = true;
+      setState(() {});
+      Position position = await determinePosition();
+      isLoading = false;
+      setState(() {});
+      Logger.i('result >>. ${result.code} === ${position.toJson()}');
+      bloc.add(BeginSessinonEvent(id: result.code!, position: position));
+      await Future.delayed(const Duration(milliseconds: 300));
+      if (bloc.state.error.isEmpty && error.isEmpty) {
+// if (mounted) {
         //   context.go('/main');
         // }
       }
+
+      await Future.delayed(const Duration(seconds: 6));
+      error = '';
+      setState(() {});
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return BlocBuilder<MainBloc, MainState>(
-        bloc: Get.find<MainBloc>(),
+        bloc: bloc,
         buildWhen: (previous, current) {
           return true;
         },
         builder: (context, state) {
           return Scaffold(
             extendBodyBehindAppBar: true,
-            appBar: const AppBars(
-              title: 'Сканирование',
+            appBar: AppBars(
+              title: state.curHystorySession.listSessions.isEmpty
+                  ? 'Сканирование'
+                  : 'История сессий',
               isBack: false,
               isLeft: true,
             ),
-            body: Container(
-              height: MediaQuery.of(context).size.height,
-              width: MediaQuery.of(context).size.width,
-              color: AppColor.blueFon,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Gap(80),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Gap(20),
-                        const Text(
-                            'Будьте бдительны при заполнении данных! В случае, если у вас возникли проблемы при эксплуатации данного приложения —пожалуйста, уведомите об этом старшего сотрудника, для скорейшего устранения выявляенных проблем.',
-                            style: AppText.text14),
-                        const Gap(50),
-                        Center(
-                            child: SvgPicture.asset('assets/svg/scan_icon.svg',
-                                width:
-                                    MediaQuery.of(context).size.width - 200)),
-                        const Gap(120),
-                        ButtonWide(
-                          text: 'Начать новую сессию',
-                          iconPath: 'assets/svg/reader.svg',
-                          onPressed: startScanning,
+            body: Stack(
+              children: [
+                Container(
+                  height: MediaQuery.of(context).size.height,
+                  width: MediaQuery.of(context).size.width,
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 20, vertical: 40),
+                  color: AppColor.blueFon,
+                  child: (state.curHystorySession.listSessions.isEmpty)
+                      ? const EmptySession()
+                      : SingleChildScrollView(
+                          child: Column(
+                            children: [
+                              const Gap(70),
+                              ...state.curHystorySession.listSessions.reversed
+                                  .map(
+                                (e) => ItemSession(item: e),
+                              )
+                            ],
+                          ),
                         ),
-                        const Gap(35),
-                      ],
-                    ),
+                ),
+                Positioned(
+                  bottom: 10,
+                  left: 20,
+                  child: Column(
+                    children: [
+                      ButtonWide(
+                        text: 'Начать новую сессию',
+                        iconPath: 'assets/svg/reader.svg',
+                        onPressed: startScanning,
+                      ),
+                      const Gap(5),
+                      SizedBox(
+                        height: 20,
+                        child: (state.error.isNotEmpty || error.isNotEmpty)
+                            ? Text(
+                                state.error.isNotEmpty ? state.error : error,
+                                style: AppText.medium14.copyWith(
+                                  color: AppColor.redError,
+                                ),
+                                maxLines: 2,
+                                textAlign: TextAlign.center,
+                              )
+                            : null,
+                      ),
+                    ],
                   ),
-                ],
-              ),
+                ),
+                if (state.isLoading || isLoading)
+                  if (state.isLoading || isLoading)
+                    const Center(
+                        child: CircularProgressIndicator.adaptive(
+                            valueColor:
+                                AlwaysStoppedAnimation<Color>(AppColor.white))),
+              ],
             ),
           );
         });

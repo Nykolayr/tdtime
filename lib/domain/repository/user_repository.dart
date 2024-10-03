@@ -1,3 +1,4 @@
+import 'package:geolocator/geolocator.dart';
 import 'package:tdtime/data/local_data.dart';
 import 'package:tdtime/domain/models/hystory_sessions.dart';
 import 'package:tdtime/domain/models/session.dart';
@@ -33,6 +34,41 @@ class UserRepository extends GetxController {
     // LocalData().clear();
     await loadUserFromLocal();
     await loadHystorySessionsFromLocal();
+  }
+
+  /// Добавление сессии в историю
+  String addHystorySessions({
+    required String id,
+    required Position position,
+  }) {
+    final result =
+        curHystorySession.listSessions.firstWhereOrNull((e) => e.id == id);
+    if (result != null) {
+      return 'Эту сессию вы уже сканировали!';
+    } else {
+      SessionScan curSession = SessionScan.init();
+      curSession.id = id;
+      curSession.position = position;
+      curSession.time = DateTime.now();
+
+      curHystorySession = HystorySessions.init();
+      curHystorySession.addSession(curSession);
+      curHystorySession.state = StateSession.open;
+      hystorySessions.add(curHystorySession);
+      saveHystorySessionsToLocal();
+    }
+    return '';
+  }
+
+  /// Добавление DataMatrix в сессию
+  String addMatrix({required String id}) {
+    if (hystorySessions.last.listSessions.last.dataMatrix.contains(id)) {
+      return 'Этот  DataMatrix вы уже сканировали!';
+    } else {
+      hystorySessions.last.listSessions.last.dataMatrix.add(id);
+      saveHystorySessionsToLocal();
+    }
+    return '';
   }
 
   /// Удаление пользователя из локального хранилища и инициализация

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/svg.dart';
 import 'package:gap/gap.dart';
+import 'package:tdtime/domain/models/session.dart';
 import 'package:tdtime/presentation/theme/theme.dart';
 
 class ButtonTab extends StatelessWidget {
@@ -50,4 +51,59 @@ class ButtonTab extends StatelessWidget {
   }
 }
 
+/// пустая страница, когда нет еще ни одной сессии
+class EmptySession extends StatelessWidget {
+  const EmptySession({
+    Key? key,
+  }) : super(key: key);
 
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Gap(70),
+        const Text(
+            'Будьте бдительны при заполнении данных! В случае, если у вас возникли проблемы при эксплуатации данного приложения —пожалуйста, уведомите об этом старшего сотрудника, для скорейшего устранения выявляенных проблем.',
+            style: AppText.text14),
+        const Gap(50),
+        Center(
+            child: SvgPicture.asset('assets/svg/scan_icon.svg',
+                width: MediaQuery.of(context).size.width - 200)),
+        const Gap(120),
+      ],
+    );
+  }
+}
+
+/// виджет сессии
+class ItemSession extends StatelessWidget {
+  final SessionScan item;
+  const ItemSession({
+    Key? key,
+    required this.item,
+  }) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: MediaQuery.of(context).size.width - 50,
+      height: 50,
+      padding: const EdgeInsets.symmetric(vertical: 5, horizontal: 15),
+      margin: const EdgeInsets.symmetric(vertical: 10),
+      decoration: const BoxDecoration(
+        color: AppColor.blueFon2,
+        borderRadius: AppDif.borderRadius10,
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.start,
+        children: [
+          SvgPicture.asset('assets/svg/reader.svg', width: 18),
+          const Gap(7),
+          Text('Сессия от ${item.getDate()} №${item.id}',
+              style: AppText.text14b.copyWith(color: AppColor.white)),
+        ],
+      ),
+    );
+  }
+}
