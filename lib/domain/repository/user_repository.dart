@@ -11,9 +11,8 @@ class UserRepository extends GetxController {
   User user = User.initial();
   String get id => user.id;
   bool get isReg => user.id.isNotEmpty;
+  HystorySessions get lastDay => hystorySessions.last;
   List<HystorySessions> hystorySessions = [];
-  SessionScan curSession = SessionScan.init();
-  HystorySessions curHystorySession = HystorySessions.init();
 
   static final UserRepository _instance = UserRepository._internal();
 
@@ -38,27 +37,45 @@ class UserRepository extends GetxController {
     } catch (e) {
       Logger.e('errror loadHystorySessionsFromLocal $e');
     }
+
+    if (hystorySessions.isEmpty) {
+      hystorySessions.add(HystorySessions.init());
+    }
   }
 
-  /// Добавление сессии в историю
+  /// закрытие сессии
+  void closeSession() {
+    lastDay.listSessions.last.state = StateSession.close;
+    Logger.i('${lastDay.listSessions.last.toJson()}');
+    saveHystorySessionsToLocal();
+    Logger.i('${hystorySessions.last.listSessions.last.toJson()}');
+  }
+
+  /// закрытие дня
+  Future<String> closeDay() async {
+    lastDay.state = StateSession.close;
+    hystorySessions.add(HystorySessions.init());
+    saveHystorySessionsToLocal();
+    await Future.delayed(const Duration(seconds: 4));
+    return '';
+  }
+
+  /// Добавление сессии
   String addHystorySessions({
     required String id,
     required Position position,
   }) {
-    final result =
-        curHystorySession.listSessions.firstWhereOrNull((e) => e.id == id);
+    final result = lastDay.listSessions.firstWhereOrNull((e) => e.id == id);
     if (result != null) {
       return 'Эту сессию вы уже сканировали!';
     } else {
-      SessionScan curSession = SessionScan.init();
-      curSession.id = id;
-      curSession.position = position;
-      curSession.time = DateTime.now();
-
-      curHystorySession = HystorySessions.init();
-      curHystorySession.addSession(curSession);
-      curHystorySession.state = StateSession.open;
-      hystorySessions.add(curHystorySession);
+      SessionScan tempSession = SessionScan.init();
+      tempSession.id = id;
+      tempSession.position = position;
+      tempSession.time = DateTime.now();
+      lastDay.addSession(tempSession);
+      lastDay.state = StateSession.open;
+      hystorySessions.last.listSessions.last.state = StateSession.open;
       saveHystorySessionsToLocal();
     }
     return '';
@@ -81,8 +98,6 @@ class UserRepository extends GetxController {
     await LocalData().clear();
     user = User.initial();
     hystorySessions = [];
-    SessionScan.init();
-    curHystorySession = HystorySessions.init();
     saveHystorySessionsToLocal();
   }
 

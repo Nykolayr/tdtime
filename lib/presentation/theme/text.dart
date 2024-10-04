@@ -213,6 +213,11 @@ class AppText {
     fontWeight: FontWeight.w700,
     fontSize: 18,
   );
+  static const TextStyle button16 = TextStyle(
+    color: AppColor.white,
+    fontWeight: FontWeight.w700,
+    fontSize: 16,
+  );
   static const TextStyle button12 = TextStyle(
     color: AppColor.white,
     fontWeight: FontWeight.w700,

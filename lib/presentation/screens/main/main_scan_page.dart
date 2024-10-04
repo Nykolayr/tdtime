@@ -7,6 +7,7 @@ import 'package:get/get.dart';
 import 'package:go_router/go_router.dart';
 import 'package:qr_code_scanner/qr_code_scanner.dart';
 import 'package:tdtime/domain/models/hystory_sessions.dart';
+import 'package:tdtime/domain/models/session.dart';
 import 'package:tdtime/presentation/screens/main/bloc/main_bloc.dart';
 import 'package:tdtime/presentation/screens/main/get_position.dart';
 import 'package:tdtime/presentation/screens/main/widget.dart';
@@ -36,8 +37,9 @@ class MainScanPageState extends State<MainScanPage> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    StateSession state = bloc.state.curHystorySession.state;
-    if (state != StateSession.close && state != StateSession.create) {
+    SessionScan session = bloc.state.dayHystorySession.listSessions.last;
+    Logger.i('statesession ${session.toJson()}');
+    if (session.state != StateSession.close) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         context.go('/main/matrix');
       });
@@ -93,9 +95,9 @@ class MainScanPageState extends State<MainScanPage> {
           return Scaffold(
             extendBodyBehindAppBar: true,
             appBar: AppBars(
-              title: state.curHystorySession.listSessions.isEmpty
+              title: state.dayHystorySession.listSessions.isEmpty
                   ? 'Сканирование'
-                  : 'История сессий',
+                  : 'История посещений ТТ',
               isBack: false,
               isLeft: true,
             ),
@@ -107,13 +109,13 @@ class MainScanPageState extends State<MainScanPage> {
                   padding:
                       const EdgeInsets.symmetric(horizontal: 20, vertical: 40),
                   color: AppColor.blueFon,
-                  child: (state.curHystorySession.listSessions.isEmpty)
+                  child: (state.dayHystorySession.listSessions.isEmpty)
                       ? const EmptySession()
                       : SingleChildScrollView(
                           child: Column(
                             children: [
                               const Gap(70),
-                              ...state.curHystorySession.listSessions.reversed
+                              ...state.dayHystorySession.listSessions.reversed
                                   .map(
                                 (e) => ItemSession(item: e),
                               )
@@ -127,11 +129,19 @@ class MainScanPageState extends State<MainScanPage> {
                   child: Column(
                     children: [
                       ButtonWide(
-                        text: 'Начать новую сессию',
+                        text: 'Добавить торговую точку',
                         iconPath: 'assets/svg/reader.svg',
                         onPressed: startScanning,
                       ),
                       const Gap(5),
+                      if (state.dayHystorySession.listSessions.isNotEmpty) ...[
+                        const Gap(30),
+                        ButtonWide(
+                          text: 'Закрыть рабочий день',
+                          iconPath: 'assets/svg/reader.svg',
+                          onPressed: () => bloc.add(ClosedayEvent()),
+                        ),
+                      ],
                       SizedBox(
                         height: 20,
                         child: (state.error.isNotEmpty || error.isNotEmpty)
@@ -149,11 +159,10 @@ class MainScanPageState extends State<MainScanPage> {
                   ),
                 ),
                 if (state.isLoading || isLoading)
-                  if (state.isLoading || isLoading)
-                    const Center(
-                        child: CircularProgressIndicator.adaptive(
-                            valueColor:
-                                AlwaysStoppedAnimation<Color>(AppColor.white))),
+                  const Center(
+                      child: CircularProgressIndicator.adaptive(
+                          valueColor:
+                              AlwaysStoppedAnimation<Color>(AppColor.white))),
               ],
             ),
           );

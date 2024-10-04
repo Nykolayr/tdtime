@@ -4,26 +4,26 @@ class MainState extends Equatable {
   final bool isLoading;
   final String error;
   final SessionScan curSession;
-  final HystorySessions curHystorySession;
+  final HystorySessions dayHystorySession;
 
   const MainState({
     required this.isLoading,
     required this.error,
     required this.curSession,
-    required this.curHystorySession,
+    required this.dayHystorySession,
   });
 
   MainState copyWith({
     bool? isLoading,
     String? error,
     SessionScan? curSession,
-    HystorySessions? curHystorySession,
+    HystorySessions? dayHystorySession,
   }) {
     return MainState(
       isLoading: isLoading ?? this.isLoading,
       error: error ?? this.error,
       curSession: curSession ?? this.curSession,
-      curHystorySession: curHystorySession ?? this.curHystorySession,
+      dayHystorySession: dayHystorySession ?? this.dayHystorySession,
     );
   }
 
@@ -38,7 +38,7 @@ class MainState extends Equatable {
                     .isNotEmpty)
             ? Get.find<UserRepository>().hystorySessions.last.listSessions.last
             : SessionScan.init(),
-        curHystorySession:
+        dayHystorySession:
             (Get.find<UserRepository>().hystorySessions.isNotEmpty)
                 ? Get.find<UserRepository>().hystorySessions.last
                 : HystorySessions.init(),
@@ -49,6 +49,6 @@ class MainState extends Equatable {
         isLoading,
         error,
         curSession,
-        curHystorySession,
+        dayHystorySession,
       ];
 }

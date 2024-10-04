@@ -13,6 +13,8 @@ class MainBloc extends Bloc<MainEvent, MainState> {
   MainBloc() : super(MainState.initial()) {
     on<BeginSessinonEvent>(_onBeginSessinonEvent);
     on<AddMatrixEvent>(_onAddMatrixEvent);
+    on<ClosedayEvent>(_onClosedayEvent);
+    on<CloseSessionEvent>(_onCloseSessionEvent);
   }
 
   /// начало сессии
@@ -27,8 +29,8 @@ class MainBloc extends Bloc<MainEvent, MainState> {
       emit(state.copyWith(error: ''));
     } else {
       emit(state.copyWith(
-          curHystorySession: repo.curHystorySession,
-          curSession: repo.curHystorySession.listSessions.last));
+          dayHystorySession: repo.lastDay,
+          curSession: repo.lastDay.listSessions.last));
     }
   }
 
@@ -43,8 +45,37 @@ class MainBloc extends Bloc<MainEvent, MainState> {
       emit(state.copyWith(error: ''));
     } else {
       emit(state.copyWith(
-          curHystorySession: repo.curHystorySession,
-          curSession: repo.curHystorySession.listSessions.last));
+          dayHystorySession: repo.lastDay,
+          curSession: repo.lastDay.listSessions.last));
     }
+  }
+
+  /// закрытие дня
+  Future<void> _onClosedayEvent(
+      ClosedayEvent event, Emitter<MainState> emit) async {
+    UserRepository repo = Get.find<UserRepository>();
+    emit(state.copyWith(isLoading: true));
+    String answer = await repo.closeDay();
+    emit(state.copyWith(isLoading: false));
+    if (answer.isNotEmpty) {
+      emit(state.copyWith(error: answer));
+      await Future.delayed(const Duration(seconds: 5));
+      emit(state.copyWith(error: ''));
+    } else {
+      emit(state.copyWith(
+        dayHystorySession: repo.lastDay,
+        curSession: SessionScan.init(),
+      ));
+    }
+  }
+
+  /// закрытие сессии
+  Future<void> _onCloseSessionEvent(
+      CloseSessionEvent event, Emitter<MainState> emit) async {
+    UserRepository repo = Get.find<UserRepository>();
+    repo.closeSession();
+    emit(state.copyWith(
+        dayHystorySession: repo.lastDay,
+        curSession: repo.lastDay.listSessions.last));
   }
 }

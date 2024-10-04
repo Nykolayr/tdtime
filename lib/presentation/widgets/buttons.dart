@@ -43,7 +43,7 @@ class ButtonWide extends StatelessWidget {
                 if (iconPath.isNotEmpty) const Gap(10),
                 Text(text,
                     textAlign: TextAlign.center,
-                    style: AppText.button18.copyWith(color: AppColor.white),
+                    style: AppText.button16.copyWith(color: AppColor.white),
                     overflow: TextOverflow.ellipsis),
                 if (isNext) const Gap(5),
                 if (isNext)

@@ -15,7 +15,10 @@ class HystorySessions {
   // Метод для инициализации
   factory HystorySessions.init() {
     return HystorySessions(
-        listSessions: [], time: DateTime.now(), state: StateSession.create);
+      listSessions: [],
+      time: DateTime.now(),
+      state: StateSession.create,
+    );
   }
 
   // Метод для добавления сессии

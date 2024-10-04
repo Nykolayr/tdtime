@@ -103,10 +103,7 @@ class ItemSession extends StatelessWidget {
           SvgPicture.asset('assets/svg/reader.svg', width: 18),
           const Gap(7),
           Expanded(
-            child: Text(
-                (item != null)
-                    ? 'Сессия от ${item!.getDate()} №${item!.id}'
-                    : title,
+            child: Text((item != null) ? 'Торговая точка №${item!.id}' : title,
                 overflow: TextOverflow.ellipsis,
                 style: AppText.text14b.copyWith(color: AppColor.white)),
           ),

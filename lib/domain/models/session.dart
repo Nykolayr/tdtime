@@ -1,4 +1,5 @@
 import 'package:geolocator/geolocator.dart';
+import 'package:tdtime/domain/models/hystory_sessions.dart';
 
 /// класс сессии для сканироваиня
 class SessionScan {
@@ -6,13 +7,16 @@ class SessionScan {
   Position position;
   DateTime time;
   List<String> dataMatrix;
+  StateSession state;
 
   // Конструктор
-  SessionScan(
-      {required this.id,
-      required this.position,
-      required this.time,
-      required this.dataMatrix});
+  SessionScan({
+    required this.id,
+    required this.position,
+    required this.time,
+    required this.dataMatrix,
+    required this.state,
+  });
 
   // Метод fromJson
   factory SessionScan.fromJson(Map<String, dynamic> json) {
@@ -21,6 +25,8 @@ class SessionScan {
       position: Position.fromMap(json['coordinates']),
       time: DateTime.parse(json['time']),
       dataMatrix: List<String>.from(json['DataMatrix']),
+      state: StateSession.values.firstWhere((e) => e.name == json['state'],
+          orElse: () => StateSession.create),
     );
   }
 
@@ -31,6 +37,7 @@ class SessionScan {
       'coordinates': position.toJson(),
       'time': time.toIso8601String(),
       'DataMatrix': dataMatrix,
+      'state': state.name,
     };
   }
 
@@ -51,6 +58,7 @@ class SessionScan {
       ),
       time: DateTime.now(),
       dataMatrix: [],
+      state: StateSession.create,
     );
   }
 

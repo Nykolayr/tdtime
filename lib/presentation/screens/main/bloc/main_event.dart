@@ -22,3 +22,10 @@ class AddMatrixEvent extends MainEvent {
   final String id;
   const AddMatrixEvent({required this.id});
 }
+
+/// закрытие дня
+class ClosedayEvent extends MainEvent {}
+
+
+/// закрытие сессии
+class CloseSessionEvent extends MainEvent {}
