@@ -1,4 +1,5 @@
 import 'package:geolocator/geolocator.dart';
+import 'package:tdtime/data/api/api.dart';
 import 'package:tdtime/data/local_data.dart';
 import 'package:tdtime/domain/models/hystory_sessions.dart';
 import 'package:tdtime/domain/models/session.dart';
@@ -41,14 +42,28 @@ class UserRepository extends GetxController {
     if (hystorySessions.isEmpty) {
       hystorySessions.add(HystorySessions.init());
     }
+    Logger.i('lastDay init ${lastDay.toJson()}');
   }
 
   /// закрытие сессии
-  void closeSession() {
+  Future<String> closeSession() async {
+    String fileName =
+        '${lastDay.listSessions.last.id}_${lastDay.listSessions.last.time.microsecondsSinceEpoch}.json';
+    Map<String, dynamic> data = {};
+    data['FIO'] = '${user.family} ${user.name} ${user.patron}';
+    data['ID'] = user.id;
+    data['TT_INFO'] = lastDay.listSessions.last.toMapForFtp();
+    Logger.i('data == $data');
+    Logger.i('fileName == $fileName');
+    String answer = await Api().uploadHystorySessionsToFtp(data, fileName);
+    Logger.i('answer == $answer');
+    if (answer.isNotEmpty) {
+      return answer;
+    }
     lastDay.listSessions.last.state = StateSession.close;
     Logger.i('${lastDay.listSessions.last.toJson()}');
     saveHystorySessionsToLocal();
-    Logger.i('${hystorySessions.last.listSessions.last.toJson()}');
+    return '';
   }
 
   /// закрытие дня
@@ -56,7 +71,7 @@ class UserRepository extends GetxController {
     lastDay.state = StateSession.close;
     hystorySessions.add(HystorySessions.init());
     saveHystorySessionsToLocal();
-    await Future.delayed(const Duration(seconds: 4));
+    await Future.delayed(const Duration(seconds: 1));
     return '';
   }
 
@@ -97,8 +112,10 @@ class UserRepository extends GetxController {
   Future clearUser() async {
     await LocalData().clear();
     user = User.initial();
-    hystorySessions = [];
-    saveHystorySessionsToLocal();
+    hystorySessions.clear();
+    hystorySessions.add(HystorySessions.init());
+    Logger.i('lastDay ${lastDay.toJson()}');
+    await saveHystorySessionsToLocal();
   }
 
   /// авторизация пользователя

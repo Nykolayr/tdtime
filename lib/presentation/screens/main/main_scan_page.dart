@@ -37,6 +37,7 @@ class MainScanPageState extends State<MainScanPage> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+    if (bloc.state.dayHystorySession.listSessions.isEmpty) return;
     SessionScan session = bloc.state.dayHystorySession.listSessions.last;
     Logger.i('statesession ${session.toJson()}');
     if (session.state != StateSession.close) {
@@ -143,14 +144,15 @@ class MainScanPageState extends State<MainScanPage> {
                         ),
                       ],
                       SizedBox(
-                        height: 20,
+                        height: 50,
                         child: (state.error.isNotEmpty || error.isNotEmpty)
                             ? Text(
                                 state.error.isNotEmpty ? state.error : error,
                                 style: AppText.medium14.copyWith(
                                   color: AppColor.redError,
                                 ),
-                                maxLines: 2,
+                                softWrap: true,
+                                maxLines: 4,
                                 textAlign: TextAlign.center,
                               )
                             : null,

@@ -144,14 +144,15 @@ class DataMatrixScanPageState extends State<DataMatrixScanPage> {
                         ],
                         const Gap(10),
                         SizedBox(
-                          height: 30,
+                          height: 50,
                           child: (state.error.isNotEmpty || error.isNotEmpty)
                               ? Text(
                                   state.error.isNotEmpty ? state.error : error,
                                   style: AppText.medium14.copyWith(
                                     color: AppColor.redError,
                                   ),
-                                  maxLines: 2,
+                                  softWrap: true,
+                                  maxLines: 4,
                                   textAlign: TextAlign.center,
                                 )
                               : null,

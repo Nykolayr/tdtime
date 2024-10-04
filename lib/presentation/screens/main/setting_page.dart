@@ -6,6 +6,7 @@ import 'package:tdtime/common/utils.dart';
 import 'package:tdtime/domain/models/user.dart';
 import 'package:tdtime/domain/repository/user_repository.dart';
 import 'package:tdtime/presentation/screens/auth/bloc/auth_bloc.dart';
+import 'package:tdtime/presentation/screens/main/bloc/main_bloc.dart';
 import 'package:tdtime/presentation/theme/theme.dart';
 import 'package:tdtime/presentation/widgets/app_bar.dart';
 import 'package:tdtime/presentation/widgets/buttons.dart';
@@ -145,7 +146,7 @@ class SettingsPageState extends State<SettingsPage> {
                   text: 'Выйти из приложения',
                   iconPath: 'assets/svg/exit.svg',
                   onPressed: () {
-                    repo.clearUser();
+                    Get.find<MainBloc>().add(ExitUserEvent());
                     context.go('/splash');
                   },
                 ),

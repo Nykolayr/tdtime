@@ -56,6 +56,14 @@ class HystorySessions {
   String getDate() {
     return '${time.day.toString().padLeft(2, '0')}.${time.month.toString().padLeft(2, '0')}.${time.year.toString().substring(2)}';
   }
+
+  String getFormattedDateTime() {
+    return '${time.day.toString().padLeft(2, '0')}_'
+        '${time.month.toString().padLeft(2, '0')}_'
+        '${time.year}_'
+        '${time.hour.toString().padLeft(2, '0')}_'
+        '${time.minute.toString().padLeft(2, '0')}';
+  }
 }
 
 enum StateSession {

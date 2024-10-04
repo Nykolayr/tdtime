@@ -66,4 +66,14 @@ class SessionScan {
   String getDate() {
     return '${time.day.toString().padLeft(2, '0')}.${time.month.toString().padLeft(2, '0')}.${time.year.toString().substring(2)}';
   }
+
+  Map<String, dynamic> toMapForFtp() {
+    return {
+      'ID_TT': id,
+      'GPRS': '${position.latitude},${position.longitude}',
+      'DATE_TIME':
+          '${time.day.toString().padLeft(2, '0')}.${time.month.toString().padLeft(2, '0')}.${time.year} ${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}',
+      'DataMatrix': dataMatrix,
+    };
+  }
 }

@@ -29,3 +29,6 @@ class ClosedayEvent extends MainEvent {}
 
 /// закрытие сессии
 class CloseSessionEvent extends MainEvent {}
+
+/// выход пользователя
+class ExitUserEvent extends MainEvent {}

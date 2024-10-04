@@ -95,7 +95,7 @@ class MainPageState extends State<MainPage> {
           controller: pageController,
           onPageChanged: (index) {
             setState(() {
-              selectedIndex = index; // Обновляем индекс при смене страницы
+              selectedIndex = index;
             });
           },
           children: pages,

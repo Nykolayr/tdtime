@@ -15,6 +15,16 @@ class MainBloc extends Bloc<MainEvent, MainState> {
     on<AddMatrixEvent>(_onAddMatrixEvent);
     on<ClosedayEvent>(_onClosedayEvent);
     on<CloseSessionEvent>(_onCloseSessionEvent);
+    on<ExitUserEvent>(_onExitUserEvent);
+  }
+
+  /// выход из приложения
+  Future<void> _onExitUserEvent(
+      ExitUserEvent event, Emitter<MainState> emit) async {
+    UserRepository repo = Get.find<UserRepository>();
+    await repo.clearUser();
+    emit(state.copyWith(
+        dayHystorySession: repo.lastDay, curSession: SessionScan.init()));
   }
 
   /// начало сессии
@@ -72,10 +82,19 @@ class MainBloc extends Bloc<MainEvent, MainState> {
   /// закрытие сессии
   Future<void> _onCloseSessionEvent(
       CloseSessionEvent event, Emitter<MainState> emit) async {
+    emit(state.copyWith(isLoading: true));
     UserRepository repo = Get.find<UserRepository>();
-    repo.closeSession();
-    emit(state.copyWith(
-        dayHystorySession: repo.lastDay,
-        curSession: repo.lastDay.listSessions.last));
+
+    String answer = await repo.closeSession();
+    emit(state.copyWith(isLoading: false));
+    if (answer.isNotEmpty) {
+      emit(state.copyWith(error: answer));
+      await Future.delayed(const Duration(seconds: 5));
+      emit(state.copyWith(error: ''));
+    } else {
+      emit(state.copyWith(
+          dayHystorySession: repo.lastDay,
+          curSession: repo.lastDay.listSessions.last));
+    }
   }
 }
