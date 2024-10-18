@@ -64,12 +64,30 @@ class MainScanPageState extends State<MainScanPage> {
 
     if (result.code == null) {
       error = 'Ошибка сканирования';
+      setState(() {});
     } else {
       isLoading = true;
       setState(() {});
-      Position position = await determinePosition();
-      isLoading = false;
-      setState(() {});
+      Position position = Position.fromMap({
+        'latitude': 0.0,
+        'longitude': 0.0,
+        'accuracy': 0.0,
+        'altitude': 0.0,
+        'altitudeAccuracy': 0.0,
+        'heading': 0.0,
+        'speed': 0.0,
+        'speedAccuracy': 0.0,
+        'timestamp': 0,
+      });
+      try {
+        position = await determinePosition();
+      } catch (e) {
+        error =
+            'Ошибка: $e при определения местоположения, будет использован нулевой адрес';
+      } finally {
+        isLoading = false;
+        setState(() {});
+      }
       Logger.i('result >>. ${result.code} === ${position.toJson()}');
       bloc.add(BeginSessinonEvent(id: result.code!, position: position));
       await Future.delayed(const Duration(milliseconds: 300));
@@ -144,16 +162,19 @@ class MainScanPageState extends State<MainScanPage> {
                         ),
                       ],
                       SizedBox(
+                        width: MediaQuery.of(context).size.width - 40,
                         height: 50,
                         child: (state.error.isNotEmpty || error.isNotEmpty)
-                            ? Text(
-                                state.error.isNotEmpty ? state.error : error,
-                                style: AppText.medium14.copyWith(
-                                  color: AppColor.redError,
+                            ? Expanded(
+                                child: Text(
+                                  state.error.isNotEmpty ? state.error : error,
+                                  style: AppText.medium14.copyWith(
+                                    color: AppColor.redError,
+                                  ),
+                                  softWrap: true,
+                                  maxLines: 4,
+                                  textAlign: TextAlign.center,
                                 ),
-                                softWrap: true,
-                                maxLines: 4,
-                                textAlign: TextAlign.center,
                               )
                             : null,
                       ),
