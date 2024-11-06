@@ -16,6 +16,41 @@ class MainBloc extends Bloc<MainEvent, MainState> {
     on<ClosedayEvent>(_onClosedayEvent);
     on<CloseSessionEvent>(_onCloseSessionEvent);
     on<ExitUserEvent>(_onExitUserEvent);
+    on<UpdateSessionIdEvent>(_onUpdateSessionIdEvent);
+  }
+
+  /// обновление ID сессии
+  Future<void> _onUpdateSessionIdEvent(
+      UpdateSessionIdEvent event, Emitter<MainState> emit) async {
+    UserRepository repo = Get.find<UserRepository>();
+    String answer =
+        repo.updateSessionId(oldId: event.oldId, newId: event.newId);
+    if (answer.isNotEmpty) {
+      emit(state.copyWith(error: answer));
+      await Future.delayed(const Duration(seconds: 6));
+      emit(state.copyWith(error: ''));
+    } else {
+      await Future.delayed(const Duration(milliseconds: 300));
+
+      // Находим индекс сессии, которую обновляем
+      final sessionIndex = repo.lastDay.listSessions
+          .indexWhere((session) => session.id == event.newId);
+
+      if (sessionIndex != -1) {
+        // Создаем новый список сессий с обновленной сессией
+        final updatedSessions =
+            List<SessionScan>.from(repo.lastDay.listSessions);
+
+        emit(state.copyWith(
+          dayHystorySession: HystorySessions(
+            listSessions: updatedSessions,
+            time: repo.lastDay.time,
+            state: repo.lastDay.state,
+          ),
+          curSession: updatedSessions[sessionIndex],
+        ));
+      }
+    }
   }
 
   /// выход из приложения

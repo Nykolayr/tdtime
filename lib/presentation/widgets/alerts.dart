@@ -50,18 +50,57 @@ Future<void> showModalContent(BuildContext context, String text, Widget child,
     builder: (BuildContext context) {
       return AlertDialog(
         alignment: Alignment.center,
-        actionsAlignment: MainAxisAlignment.center,
-        actionsPadding: const EdgeInsets.only(bottom: 20),
-        title: Text(text, textAlign: TextAlign.center, style: AppText.title18),
+        actionsAlignment: MainAxisAlignment.spaceEvenly,
+        actionsPadding:
+            const EdgeInsets.symmetric(horizontal: 15, vertical: 20),
+        title: Text(text,
+            textAlign: TextAlign.center,
+            style: AppText.medium14.copyWith(color: AppColor.blueFon)),
         content: child,
         actions: <Widget>[
-          Buttons.alert(
-            text: 'Отмена',
-            onPressed: cansel,
+          Container(
+            width: MediaQuery.of(context).size.width / 3,
+            height: 50,
+            decoration: BoxDecoration(
+              color: AppColor.white,
+              borderRadius: const BorderRadius.all(Radius.circular(35)),
+              border: Border.all(color: AppColor.blueFon, width: 2),
+            ),
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                borderRadius: const BorderRadius.all(Radius.circular(35)),
+                onTap: cansel,
+                child: Center(
+                  child: Text(
+                    'Отмена',
+                    style: AppText.medium12.copyWith(color: AppColor.blueFon),
+                  ),
+                ),
+              ),
+            ),
           ),
-          Buttons.alert(
-            text: butText,
-            onPressed: save,
+          Container(
+            width: MediaQuery.of(context).size.width / 3,
+            height: 50,
+            decoration: BoxDecoration(
+              color: AppColor.blueFon,
+              borderRadius: const BorderRadius.all(Radius.circular(35)),
+              border: Border.all(color: AppColor.blueFon, width: 2),
+            ),
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                borderRadius: const BorderRadius.all(Radius.circular(35)),
+                onTap: save,
+                child: Center(
+                  child: Text(
+                    butText,
+                    style: AppText.medium12.copyWith(color: AppColor.white),
+                  ),
+                ),
+              ),
+            ),
           ),
         ],
       );

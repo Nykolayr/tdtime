@@ -1,8 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/svg.dart';
 import 'package:gap/gap.dart';
+import 'package:get/get.dart';
 import 'package:tdtime/domain/models/session.dart';
+import 'package:tdtime/presentation/screens/main/edti_TT.dart';
 import 'package:tdtime/presentation/theme/theme.dart';
+import 'package:tdtime/presentation/widgets/alerts.dart';
+
+import 'bloc/main_bloc.dart';
 
 class ButtonTab extends StatelessWidget {
   final int current;
@@ -106,6 +111,45 @@ class ItemSession extends StatelessWidget {
             child: Text((item != null) ? 'Торговая точка №${item!.id}' : title,
                 overflow: TextOverflow.ellipsis,
                 style: AppText.text14b.copyWith(color: AppColor.white)),
+          ),
+          GestureDetector(
+            onTap: () {
+              final controller = TextEditingController(text: item?.id ?? '');
+              showModalContent(
+                context,
+                'Редактирование ID торговой точки',
+                EditIdModal(
+                  currentId: item!.id,
+                  controller: controller,
+                ),
+                () => Navigator.pop(context),
+                () {
+                  final newId = controller.text;
+                  if (newId.isNotEmpty && newId != item?.id) {
+                    Get.find<MainBloc>().add(UpdateSessionIdEvent(
+                      oldId: item!.id,
+                      newId: newId,
+                    ));
+                  }
+                  Navigator.pop(context);
+                },
+              );
+            },
+            child: Container(
+              width: 40,
+              height: 40,
+              decoration: const BoxDecoration(
+                color: AppColor.white,
+                borderRadius: BorderRadius.all(Radius.circular(8)),
+              ),
+              child: const Center(
+                child: Icon(
+                  Icons.edit,
+                  size: 18,
+                  color: Colors.black,
+                ),
+              ),
+            ),
           ),
         ],
       ),

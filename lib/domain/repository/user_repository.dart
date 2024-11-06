@@ -45,6 +45,24 @@ class UserRepository extends GetxController {
     Logger.i('lastDay init ${lastDay.toJson()}');
   }
 
+  /// Обновление ID сессии
+  String updateSessionId({required String oldId, required String newId}) {
+    final session = lastDay.listSessions.firstWhereOrNull((e) => e.id == oldId);
+    if (session == null) {
+      return 'Сессия не найдена!';
+    }
+
+    final existingSession =
+        lastDay.listSessions.firstWhereOrNull((e) => e.id == newId);
+    if (existingSession != null) {
+      return 'Сессия с таким ID уже существует!';
+    }
+
+    session.id = newId;
+    saveHystorySessionsToLocal();
+    return '';
+  }
+
   /// закрытие сессии
   Future<String> closeSession() async {
     String fileName =

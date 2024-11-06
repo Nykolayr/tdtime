@@ -26,9 +26,18 @@ class AddMatrixEvent extends MainEvent {
 /// закрытие дня
 class ClosedayEvent extends MainEvent {}
 
-
 /// закрытие сессии
 class CloseSessionEvent extends MainEvent {}
 
 /// выход пользователя
 class ExitUserEvent extends MainEvent {}
+
+/// обновление ID сессии
+class UpdateSessionIdEvent extends MainEvent {
+  final String oldId;
+  final String newId;
+  const UpdateSessionIdEvent({
+    required this.oldId,
+    required this.newId,
+  });
+}
