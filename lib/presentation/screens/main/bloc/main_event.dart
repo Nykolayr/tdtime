@@ -41,3 +41,12 @@ class UpdateSessionIdEvent extends MainEvent {
     required this.newId,
   });
 }
+
+/// удаление сессии
+class DeleteMatrixEvent extends MainEvent {
+  final String id;
+  const DeleteMatrixEvent({required this.id});
+}
+
+/// отмена сканирования
+class UndoMatrixEvent extends MainEvent {}

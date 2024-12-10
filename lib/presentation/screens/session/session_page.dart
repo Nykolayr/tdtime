@@ -71,6 +71,15 @@ class DataMatrixScanPageState extends State<DataMatrixScanPage> {
     }
   }
 
+  /// отмена сканирования
+  void exitScanning() {
+    bloc.add(UndoMatrixEvent());
+
+    if (context.mounted) {
+      GoRouter.of(context).pop();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return PopScope(
@@ -126,22 +135,24 @@ class DataMatrixScanPageState extends State<DataMatrixScanPage> {
                           iconPath: 'assets/svg/reader.svg',
                           onPressed: startScanning,
                         ),
-                        if (state.dayHystorySession.listSessions.isNotEmpty &&
-                            state.dayHystorySession.listSessions.last.dataMatrix
-                                .isNotEmpty) ...[
-                          const Gap(30),
-                          ButtonWide(
-                              text: 'Закончить сканирование в ТТ',
-                              iconPath: 'assets/svg/reader.svg',
-                              onPressed: () async {
-                                bloc.add(CloseSessionEvent());
-                                await Future.delayed(
-                                    const Duration(milliseconds: 300));
-                                if (context.mounted) {
-                                  GoRouter.of(context).pop();
-                                }
-                              }),
-                        ],
+                        const Gap(20),
+                        ButtonWide(
+                            text: 'Закончить сканирование в ТТ',
+                            iconPath: 'assets/svg/exit.svg',
+                            onPressed: () async {
+                              bloc.add(CloseSessionEvent());
+                              await Future.delayed(
+                                  const Duration(milliseconds: 100));
+                              if (context.mounted) {
+                                GoRouter.of(context).pop();
+                              }
+                            }),
+                        const Gap(20),
+                        ButtonWide(
+                          text: 'Отменить сканирование ТТ',
+                          iconPath: 'assets/svg/undo.svg',
+                          onPressed: exitScanning,
+                        ),
                         const Gap(10),
                         SizedBox(
                           height: 50,

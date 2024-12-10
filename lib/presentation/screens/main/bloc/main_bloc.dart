@@ -17,6 +17,32 @@ class MainBloc extends Bloc<MainEvent, MainState> {
     on<CloseSessionEvent>(_onCloseSessionEvent);
     on<ExitUserEvent>(_onExitUserEvent);
     on<UpdateSessionIdEvent>(_onUpdateSessionIdEvent);
+    on<UndoMatrixEvent>(_onUndoMatrixEvent);
+    on<DeleteMatrixEvent>(_onDeleteMatrixEvent);
+  }
+
+  /// удаление сессии
+  Future<void> _onDeleteMatrixEvent(
+      DeleteMatrixEvent event, Emitter<MainState> emit) async {
+    emit(state.copyWith(isLoading: true));
+    UserRepository repo = Get.find<UserRepository>();
+    repo.deleteMatrix(id: event.id);
+    emit(state.copyWith(
+      isLoading: false,
+      dayHystorySession: repo.lastDay,
+      curSession: repo.lastDay.listSessions.last,
+    ));
+  }
+
+  /// отмена сканирования
+  Future<void> _onUndoMatrixEvent(
+      UndoMatrixEvent event, Emitter<MainState> emit) async {
+    UserRepository repo = Get.find<UserRepository>();
+    repo.undoMatrix();
+    emit(state.copyWith(
+      dayHystorySession: repo.lastDay,
+      curSession: repo.lastDay.listSessions.last,
+    ));
   }
 
   /// обновление ID сессии

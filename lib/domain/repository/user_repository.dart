@@ -45,6 +45,20 @@ class UserRepository extends GetxController {
     Logger.i('lastDay init ${lastDay.toJson()}');
   }
 
+  /// удаление сессии
+  void deleteMatrix({required String id}) {
+    hystorySessions.last.listSessions.removeWhere((e) => e.id == id);
+    hystorySessions.last.state = StateSession.open;
+    saveHystorySessionsToLocal();
+  }
+
+  /// отмена сканирования
+  void undoMatrix() {
+    hystorySessions.last.listSessions.removeLast();
+    hystorySessions.last.state = StateSession.open;
+    saveHystorySessionsToLocal();
+  }
+
   /// Обновление ID сессии
   String updateSessionId({required String oldId, required String newId}) {
     final session = lastDay.listSessions.firstWhereOrNull((e) => e.id == oldId);
@@ -99,6 +113,7 @@ class UserRepository extends GetxController {
     required Position position,
   }) {
     final result = lastDay.listSessions.firstWhereOrNull((e) => e.id == id);
+    Logger.i('addHystorySessions ${lastDay.listSessions.length} $id $position');
     if (result != null) {
       return 'Эту сессию вы уже сканировали!';
     } else {

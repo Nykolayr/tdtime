@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:gap/gap.dart';
 import 'package:get/get.dart';
@@ -6,6 +8,7 @@ import 'package:tdtime/common/utils.dart';
 import 'package:tdtime/presentation/screens/main/bloc/main_bloc.dart';
 import 'package:tdtime/presentation/screens/scan/qr_code_scan.dart';
 import 'package:tdtime/presentation/theme/theme.dart';
+import 'package:tdtime/presentation/widgets/alerts.dart';
 import 'package:tdtime/presentation/widgets/buttons.dart';
 import 'package:tdtime/presentation/widgets/text_field2.dart';
 
@@ -53,19 +56,64 @@ class EditIdModal extends StatelessWidget {
                   ),
                 ),
               );
+
               if (result.code != null) {
-                Get.find<MainBloc>().add(UpdateSessionIdEvent(
-                  oldId: currentId,
-                  newId: result.code!,
-                ));
-                if (context.mounted) {
-                  Navigator.of(context).pop();
+                if (result.format != BarcodeFormat.dataMatrix) {
+                  Get.find<MainBloc>().add(UpdateSessionIdEvent(
+                    oldId: currentId,
+                    newId: result.code!,
+                  ));
+                  if (context.mounted) {
+                    Navigator.of(context).pop();
+                  }
                 }
+              }
+            },
+          ),
+          const Gap(20),
+          ButtonWide(
+            text: 'Удалить ТТ',
+            iconPath: 'assets/svg/trash.svg',
+            onPressed: () async {
+              bool? result =
+                  await showDeleteConfirmationModal(context, currentId);
+              if (result == true) {
+                // ignore: use_build_context_synchronously
+                Navigator.of(context).pop();
               }
             },
           ),
         ],
       ),
     );
+  }
+
+  // Новый метод для отображения диалогового окна подтверждения
+  Future<bool?> showDeleteConfirmationModal(BuildContext context, String id) {
+    final Completer<bool?> completer = Completer<bool?>();
+
+    showModalContent(
+      context,
+      'Подтверждение удаления',
+      const Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text('Вы уверены, что хотите удалить сессию ТТ?'),
+        ],
+      ),
+      () {
+        Navigator.of(context).pop();
+        // Действие при отмене
+        completer.complete(false); // Возвращаем false
+      },
+      () {
+        Get.find<MainBloc>().add(DeleteMatrixEvent(id: id));
+        Navigator.of(context).pop();
+        completer.complete(true); // Возвращаем true
+      },
+      butText: 'Удалить',
+    );
+
+    return completer.future; // Возвращаем Future
   }
 }

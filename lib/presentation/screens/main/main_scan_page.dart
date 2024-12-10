@@ -66,37 +66,43 @@ class MainScanPageState extends State<MainScanPage> {
       error = 'Ошибка сканирования';
       setState(() {});
     } else {
-      isLoading = true;
-      setState(() {});
-      Position position = Position.fromMap({
-        'latitude': 0.0,
-        'longitude': 0.0,
-        'accuracy': 0.0,
-        'altitude': 0.0,
-        'altitudeAccuracy': 0.0,
-        'heading': 0.0,
-        'speed': 0.0,
-        'speedAccuracy': 0.0,
-        'timestamp': 0,
-      });
-      try {
-        position = await determinePosition();
-      } catch (e) {
-        error =
-            'Ошибка: $e при определения местоположения, будет использован нулевой адрес';
-      } finally {
-        isLoading = false;
+      if (result.format == BarcodeFormat.dataMatrix) {
+        error = 'Это неправильный формат! ';
         setState(() {});
-      }
-      Logger.i('result >>. ${result.code} === ${position.toJson()}');
-      bloc.add(BeginSessinonEvent(id: result.code!, position: position));
-      await Future.delayed(const Duration(milliseconds: 300));
-      if (bloc.state.error.isEmpty && error.isEmpty) {
-        if (mounted) {
-          context.go('/main/matrix');
+      } else {
+        isLoading = true;
+        setState(() {});
+        Position position = Position.fromMap({
+          'latitude': 0.0,
+          'longitude': 0.0,
+          'accuracy': 0.0,
+          'altitude': 0.0,
+          'altitudeAccuracy': 0.0,
+          'heading': 0.0,
+          'speed': 0.0,
+          'speedAccuracy': 0.0,
+          'timestamp': 0,
+        });
+        try {
+          position =
+              await determinePosition().timeout(const Duration(seconds: 3));
+        } catch (e) {
+          // error =
+          //     'Ошибка при определения местоположения, будет использован нулевой адрес';
+          Logger.e('Ошибка при определения местоположения $e');
+        } finally {
+          isLoading = false;
+          setState(() {});
+        }
+        Logger.i('result >>. ${result.code} === ${position.toJson()}');
+        bloc.add(BeginSessinonEvent(id: result.code!, position: position));
+        await Future.delayed(const Duration(milliseconds: 100));
+        if (bloc.state.error.isEmpty && error.isEmpty) {
+          if (mounted) {
+            context.go('/main/matrix');
+          }
         }
       }
-
       await Future.delayed(const Duration(seconds: 6));
       error = '';
       setState(() {});
@@ -165,16 +171,22 @@ class MainScanPageState extends State<MainScanPage> {
                         width: MediaQuery.of(context).size.width - 40,
                         height: 50,
                         child: (state.error.isNotEmpty || error.isNotEmpty)
-                            ? Expanded(
-                                child: Text(
-                                  state.error.isNotEmpty ? state.error : error,
-                                  style: AppText.medium14.copyWith(
-                                    color: AppColor.redError,
+                            ? Column(
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      state.error.isNotEmpty
+                                          ? state.error
+                                          : error,
+                                      style: AppText.medium14.copyWith(
+                                        color: AppColor.redError,
+                                      ),
+                                      softWrap: true,
+                                      maxLines: 4,
+                                      textAlign: TextAlign.center,
+                                    ),
                                   ),
-                                  softWrap: true,
-                                  maxLines: 4,
-                                  textAlign: TextAlign.center,
-                                ),
+                                ],
                               )
                             : null,
                       ),
