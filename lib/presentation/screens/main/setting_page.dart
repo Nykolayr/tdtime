@@ -63,10 +63,6 @@ class SettingsPageState extends State<SettingsPage> {
           nameController.text = fio[1];
           familyController.text = fio[0];
           patronController.text = fio[2];
-          // Get.find<AuthBloc>().add(AuthUserEvent(
-          //     family: fio[0], name: fio[1], patron: fio[2], id: user.id));
-
-          // if (context.mounted) context.go('/main');
         }
         setState(() {});
       }
