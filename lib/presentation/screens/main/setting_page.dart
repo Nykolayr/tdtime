@@ -208,6 +208,15 @@ class SettingsPageState extends State<SettingsPage> {
                     context.go('/splash');
                   },
                 ),
+                const Gap(20),
+                ButtonWide(
+                  text: 'Удалить аккаунт',
+                  iconPath: 'assets/svg/trash.svg',
+                  onPressed: () {
+                    Get.find<MainBloc>().add(ExitUserEvent());
+                    context.go('/splash');
+                  },
+                ),
                 const Gap(35),
               ],
             ),
