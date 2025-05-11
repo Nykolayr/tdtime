@@ -1,7 +1,5 @@
-import 'dart:convert';
-import 'dart:io';
 import 'package:get/get.dart';
-import 'package:path_provider/path_provider.dart';
+
 import 'package:tdtime/data/api/api.dart';
 import 'package:tdtime/data/mock/routers_mock.dart';
 import 'package:tdtime/data/mock/tt_mock.dart';
@@ -9,6 +7,7 @@ import 'package:tdtime/domain/models/market_center.dart';
 import 'package:tdtime/domain/models/week_routers.dart';
 import 'package:tdtime/domain/repository/user_repository.dart';
 import 'package:flutter_easylogger/flutter_logger.dart';
+import 'package:tdtime/data/local_data.dart';
 
 class RoutersRepository {
   static final RoutersRepository _instance = RoutersRepository._internal();
@@ -29,20 +28,29 @@ class RoutersRepository {
       return;
     }
 
+    Logger.i('Starting data initialization for user ${user.id}');
     try {
       // Пытаемся загрузить данные из FTP
+      Logger.i('Attempting to load data from FTP...');
       await _loadFromFtp();
+      Logger.i('Successfully loaded data from FTP');
     } catch (e) {
       Logger.e('Failed to load from FTP: $e');
       // Если не получилось, пробуем из локальных файлов
       try {
+        Logger.i('Attempting to load data from local storage...');
         await _loadFromLocal();
+        Logger.i('Successfully loaded data from local storage');
       } catch (e) {
         Logger.e('Failed to load from local: $e');
         // Если и локальных нет, берем из моковых
+        Logger.i('Loading mock data...');
         await _loadFromMock();
+        Logger.i('Successfully loaded and saved mock data');
       }
     }
+    Logger.i(
+        'Data initialization completed. Loaded ${marketCenters.length} market centers and ${weekRouters.length} routes');
   }
 
   // Загрузка данных из FTP
@@ -50,27 +58,29 @@ class RoutersRepository {
     final user = Get.find<UserRepository>().user;
     if (user.id.isEmpty) return;
 
-    // Загружаем список ТЦ
-    final ttJson = await Api().downloadJsonFile('all_tt.json');
-    if (ttJson != null) {
-      marketCenters = (ttJson['marketCenters'] as List)
+    try {
+      // Загружаем список ТЦ
+      final ttData = await Api().downloadJsonFile('all_tt.json');
+      marketCenters = (ttData['marketCenters'] as List)
           .map((mc) => MarketCenter.fromJson(mc))
           .toList();
-    }
 
-    // Загружаем маршруты
-    final routersJson = await Api().downloadJsonFile('${user.id}_routers.json');
-    if (routersJson != null) {
-      weekRouters = (routersJson['routers'] as List)
+      // Загружаем маршруты
+      final routersData =
+          await Api().downloadJsonFile('${user.id}_routers.json');
+      weekRouters = (routersData['routers'] as List)
           .map((r) => WeekRouters.fromJson(r))
           .toList();
-    }
 
-    // Если данные успешно загружены, сохраняем их локально
-    if (marketCenters.isNotEmpty && weekRouters.isNotEmpty) {
-      await _saveToLocal();
-    } else {
-      throw 'Failed to load data from FTP';
+      // Если данные успешно загружены, сохраняем их локально
+      if (marketCenters.isNotEmpty && weekRouters.isNotEmpty) {
+        await _saveToLocal();
+      } else {
+        throw 'Failed to load data from FTP';
+      }
+    } catch (e) {
+      Logger.e('Failed to load from FTP: $e');
+      rethrow;
     }
   }
 
@@ -79,28 +89,40 @@ class RoutersRepository {
     final user = Get.find<UserRepository>().user;
     if (user.id.isEmpty) return;
 
-    final dir = await getApplicationDocumentsDirectory();
+    try {
+      // Загружаем список ТЦ
+      final ttData = await LocalData.loadJson(key: LocalDataKey.marketCenters);
+      if (ttData['error'] == null) {
+        marketCenters = (ttData['marketCenters'] as List)
+            .map((mc) => MarketCenter.fromJson(mc))
+            .toList();
+      }
 
-    // Загружаем список ТЦ
-    final ttFile = File('${dir.path}/all_tt.json');
-    if (await ttFile.exists()) {
-      final ttJson = jsonDecode(await ttFile.readAsString());
-      marketCenters = (ttJson['marketCenters'] as List)
-          .map((mc) => MarketCenter.fromJson(mc))
-          .toList();
-    }
+      // Загружаем маршруты
+      final routersData =
+          await LocalData.loadListJson(key: LocalDataKey.routers);
+      if (routersData.isNotEmpty && routersData.first['error'] == null) {
+        weekRouters = routersData.map((r) {
+          return WeekRouters(
+            day: WeekDay.values.firstWhere(
+              (day) => day.name == r['day'],
+            ),
+            marketCenterIds: (r['marketCenterIds'] as List)
+                .map((id) => id.toString())
+                .toList(),
+          );
+        }).toList();
+      }
 
-    // Загружаем маршруты
-    final routersFile = File('${dir.path}/${user.id}_routers.json');
-    if (await routersFile.exists()) {
-      final routersJson = jsonDecode(await routersFile.readAsString());
-      weekRouters = (routersJson['routers'] as List)
-          .map((r) => WeekRouters.fromJson(r))
-          .toList();
-    }
-
-    // Если локальных данных нет, берем из моковых и сохраняем
-    if (marketCenters.isEmpty || weekRouters.isEmpty) {
+      // Если локальных данных нет, берем из моковых и сохраняем
+      if (marketCenters.isEmpty || weekRouters.isEmpty) {
+        Logger.i('No local data found, loading from mock...');
+        await _loadFromMock();
+        return; // Прерываем выполнение, так как данные уже загружены в _loadFromMock
+      }
+    } catch (e) {
+      Logger.e('Failed to load from local: $e');
+      Logger.i('Loading from mock after local load error...');
       await _loadFromMock();
     }
   }
@@ -113,20 +135,26 @@ class RoutersRepository {
         day: WeekDay.values.firstWhere(
           (day) => day.toString().split('.').last.toLowerCase() == route['day'],
         ),
-        marketCenterIds: List<String>.from(route['marketCenterIds']),
+        marketCenterIds: (route['marketCenterIds'] as List)
+            .map((id) => id.toString())
+            .toList(),
       );
     }).toList();
 
-    // Сохраняем моковые данные в FTP и локально
+    // Сначала пытаемся сохранить в FTP
     try {
       await _saveToFtp();
+      Logger.i('Successfully saved mock data to FTP');
     } catch (e) {
-      Logger.e('Failed to save to FTP: $e');
+      Logger.e('Failed to save mock data to FTP: $e');
     }
+
+    // Затем сохраняем локально
     try {
       await _saveToLocal();
+      Logger.i('Successfully saved mock data locally');
     } catch (e) {
-      Logger.e('Failed to save to local: $e');
+      Logger.e('Failed to save mock data locally: $e');
     }
   }
 
@@ -153,21 +181,21 @@ class RoutersRepository {
     final user = Get.find<UserRepository>().user;
     if (user.id.isEmpty) return;
 
-    final dir = await getApplicationDocumentsDirectory();
+    try {
+      // Сохраняем список ТЦ
+      final ttJson = {
+        'marketCenters': marketCenters.map((mc) => mc.toJson()).toList(),
+      };
+      await LocalData.saveJson(json: ttJson, key: LocalDataKey.marketCenters);
 
-    // Сохраняем список ТЦ
-    final ttFile = File('${dir.path}/all_tt.json');
-    final ttJson = {
-      'marketCenters': marketCenters.map((mc) => mc.toJson()).toList(),
-    };
-    await ttFile.writeAsString(jsonEncode(ttJson));
-
-    // Сохраняем маршруты
-    final routersFile = File('${dir.path}/${user.id}_routers.json');
-    final routersJson = {
-      'routers': weekRouters.map((r) => r.toJson()).toList(),
-    };
-    await routersFile.writeAsString(jsonEncode(routersJson));
+      // Сохраняем маршруты
+      await LocalData.saveListJson(
+        json: weekRouters.map((r) => r.toJson()).toList(),
+        key: LocalDataKey.routers,
+      );
+    } catch (e) {
+      Logger.e('Failed to save to local: $e');
+    }
   }
 
   // Получение всех торговых центров

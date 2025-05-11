@@ -4,12 +4,11 @@ import 'dart:io';
 import 'package:ftpconnect/ftpconnect.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:tdtime/common/constants.dart';
-import 'package:tdtime/data/api/dio_client.dart';
-import 'package:get/get.dart';
+
 import 'package:flutter_easylogger/flutter_logger.dart' as logger;
 
 class Api {
-  final DioClient dio = Get.find<DioClient>();
+  // final DioClient dio = Get.find<DioClient>();
 
   /// выгрузка сессии
   Future<String> uploadHystorySessionsToFtp(
@@ -65,7 +64,16 @@ class Api {
       await tempFile.writeAsString(jsonEncode(jsonData));
 
       ftpConnect.supportIPV6 = true;
-      await ftpConnect.changeDirectory('load_json');
+      await ftpConnect.changeDirectory('user_app');
+
+      // Создаем директорию routes, если её нет
+      try {
+        await ftpConnect.makeDirectory('routes');
+      } catch (e) {
+        logger.Logger.e('Ошибка при создании директории routes: $e');
+      }
+
+      await ftpConnect.changeDirectory('routes');
       await ftpConnect.uploadFile(tempFile);
 
       await ftpConnect.disconnect();
@@ -76,6 +84,7 @@ class Api {
     }
   }
 
+  // Скачивание JSON файла с FTP
   Future<Map<String, dynamic>> downloadJsonFile(String fileName) async {
     try {
       final ftpConnect = FTPConnect(
@@ -86,20 +95,22 @@ class Api {
       );
 
       await ftpConnect.connect();
+      ftpConnect.supportIPV6 = true;
+      await ftpConnect.changeDirectory('user_app');
+      await ftpConnect.changeDirectory('routes');
 
-      // Создание временного файла для скачивания
+      // Создаем временный файл
       final directory = await getTemporaryDirectory();
       final tempFile = File('${directory.path}/$fileName');
+      await tempFile.create();
 
-      ftpConnect.supportIPV6 = true;
-      await ftpConnect.changeDirectory('load_json');
-      await ftpConnect.downloadFile('$fileName.json', tempFile);
-
+      // Скачиваем файл
+      await ftpConnect.downloadFile(fileName, tempFile);
       final jsonString = await tempFile.readAsString();
-      await ftpConnect.disconnect();
       await tempFile.delete();
 
-      return jsonDecode(jsonString) as Map<String, dynamic>;
+      await ftpConnect.disconnect();
+      return jsonDecode(jsonString);
     } catch (e) {
       logger.Logger.e('Ошибка при скачивании JSON файла: $e');
       rethrow;

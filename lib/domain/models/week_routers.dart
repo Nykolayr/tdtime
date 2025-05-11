@@ -7,7 +7,8 @@ class WeekRouters {
   factory WeekRouters.fromJson(Map<String, dynamic> json) {
     return WeekRouters(
       day: WeekDay.values.firstWhere((e) => e.name == json['day']),
-      marketCenterIds: json['marketCenterIds'],
+      marketCenterIds:
+          (json['marketCenterIds'] as List).map((id) => id.toString()).toList(),
     );
   }
 
