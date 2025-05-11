@@ -2,6 +2,7 @@ import 'package:flutter_easylogger/flutter_logger.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:tdtime/data/api/api.dart';
 import 'package:tdtime/data/api/dio_client.dart';
+import 'package:tdtime/domain/repository/routers_repository.dart';
 import 'package:tdtime/domain/repository/user_repository.dart';
 import 'package:tdtime/presentation/screens/auth/bloc/auth_bloc.dart';
 import 'package:tdtime/presentation/screens/main/bloc/main_bloc.dart';
@@ -25,6 +26,18 @@ Future initMain() async {
     Logger.e('UserRepository = $e');
     return 'user $e';
   }
+
+  try {
+    await Get.putAsync(() async {
+      final routersRepository = RoutersRepository();
+      await routersRepository.init();
+      return routersRepository;
+    });
+  } catch (e) {
+    Logger.e('UserRepository = $e');
+    return 'user $e';
+  }
+
   try {
     Get.put<DioClient>(DioClient(Dio()));
     Get.put<Api>(Api());

@@ -6,9 +6,10 @@ import 'package:tdtime/domain/models/session.dart';
 import 'package:tdtime/domain/models/user.dart';
 import 'package:flutter_easylogger/flutter_logger.dart';
 import 'package:get/get.dart';
+import 'package:tdtime/domain/repository/routers_repository.dart';
 
 /// репо для юзера
-class UserRepository extends GetxController {
+class UserRepository {
   User user = User.initial();
   String get id => user.id;
   bool get isReg => user.id.isNotEmpty;
@@ -152,9 +153,9 @@ class UserRepository extends GetxController {
   }
 
   /// авторизация пользователя
-
   authUser({required User userIn}) async {
     user = userIn;
+    await Get.find<RoutersRepository>().init();
     saveUserToLocal();
   }
 

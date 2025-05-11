@@ -6,11 +6,17 @@ import 'package:path_provider/path_provider.dart';
 import 'package:tdtime/common/constants.dart';
 import 'package:tdtime/data/api/dio_client.dart';
 import 'package:get/get.dart';
+import 'package:flutter_easylogger/flutter_logger.dart' as logger;
 
 class Api {
   final DioClient dio = Get.find<DioClient>();
+
+  /// выгрузка сессии
   Future<String> uploadHystorySessionsToFtp(
       Map<String, dynamic> data, String fileName) async {
+    final jsonData = jsonEncode(data);
+    logger.Logger.i('data == $jsonData');
+    logger.Logger.i('fileName == $fileName');
     final ftpConnect = FTPConnect(
       hostFtp,
       user: loginFtp,
@@ -36,8 +42,67 @@ class Api {
       await tempFile.delete(); // Удаляем временный файл
       return ''; // Возвращаем пустую строку при успешном завершении
     } catch (e) {
-      print('ошибка ftpConnect $e');
+      logger.Logger.e('ошибка ftpConnect $e');
       return e.toString(); // Возвращаем сообщение об ошибке
+    }
+  }
+
+  Future<void> uploadJsonFile(
+      String fileName, Map<String, dynamic> jsonData) async {
+    try {
+      final ftpConnect = FTPConnect(
+        hostFtp,
+        user: loginFtp,
+        pass: passFtp,
+        securityType: SecurityType.FTP,
+      );
+
+      await ftpConnect.connect();
+
+      // Создание временного файла
+      final directory = await getTemporaryDirectory();
+      final tempFile = File('${directory.path}/$fileName');
+      await tempFile.writeAsString(jsonEncode(jsonData));
+
+      ftpConnect.supportIPV6 = true;
+      await ftpConnect.changeDirectory('load_json');
+      await ftpConnect.uploadFile(tempFile);
+
+      await ftpConnect.disconnect();
+      await tempFile.delete();
+    } catch (e) {
+      logger.Logger.e('Ошибка при загрузке JSON файла: $e');
+      rethrow;
+    }
+  }
+
+  Future<Map<String, dynamic>> downloadJsonFile(String fileName) async {
+    try {
+      final ftpConnect = FTPConnect(
+        hostFtp,
+        user: loginFtp,
+        pass: passFtp,
+        securityType: SecurityType.FTP,
+      );
+
+      await ftpConnect.connect();
+
+      // Создание временного файла для скачивания
+      final directory = await getTemporaryDirectory();
+      final tempFile = File('${directory.path}/$fileName');
+
+      ftpConnect.supportIPV6 = true;
+      await ftpConnect.changeDirectory('load_json');
+      await ftpConnect.downloadFile('$fileName.json', tempFile);
+
+      final jsonString = await tempFile.readAsString();
+      await ftpConnect.disconnect();
+      await tempFile.delete();
+
+      return jsonDecode(jsonString) as Map<String, dynamic>;
+    } catch (e) {
+      logger.Logger.e('Ошибка при скачивании JSON файла: $e');
+      rethrow;
     }
   }
 }

@@ -2,9 +2,9 @@
 
 class User {
   String id;
-  String family; // имя
-  String name; // пароль
-  String patron; // почта
+  String family; // фамилия
+  String name; // имя
+  String patron; // отчество
 
   User({
     required this.id,
@@ -38,5 +38,4 @@ class User {
       'patron': patron,
     };
   }
-  
 }
