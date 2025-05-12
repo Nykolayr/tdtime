@@ -68,4 +68,10 @@ class LocalData {
   }
 }
 
-enum LocalDataKey { user, hystorySessions, marketCenters, routers }
+enum LocalDataKey {
+  user,
+  hystorySessions,
+  marketCenters,
+  routers,
+  todayRouters
+}

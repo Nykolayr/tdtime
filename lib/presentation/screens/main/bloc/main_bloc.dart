@@ -1,10 +1,15 @@
 import 'package:bloc/bloc.dart';
 import 'package:equatable/equatable.dart';
+import 'package:flutter_easylogger/flutter_logger.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:get/get.dart';
 import 'package:tdtime/domain/models/hystory_sessions.dart';
+import 'package:tdtime/domain/models/market_center.dart';
 import 'package:tdtime/domain/models/session.dart';
+import 'package:tdtime/domain/models/week_routers.dart';
+import 'package:tdtime/domain/repository/routers_repository.dart';
 import 'package:tdtime/domain/repository/user_repository.dart';
+import 'package:tdtime/presentation/screens/main/get_position.dart';
 
 part 'main_event.dart';
 part 'main_state.dart';
@@ -19,6 +24,47 @@ class MainBloc extends Bloc<MainEvent, MainState> {
     on<UpdateSessionIdEvent>(_onUpdateSessionIdEvent);
     on<UndoMatrixEvent>(_onUndoMatrixEvent);
     on<DeleteMatrixEvent>(_onDeleteMatrixEvent);
+    on<LoadRoutersEvent>(_onLoadRoutersEvent);
+    on<UpdateWeekRoutersEvent>(_onUpdateWeekRoutersEvent);
+    on<SelectDayEvent>(_onSelectDayEvent);
+    on<SelectMarketCenterEvent>(_onSelectMarketCenterEvent);
+  }
+
+  /// выбор торговой точки в списке торговых точек
+  Future<void> _onSelectMarketCenterEvent(
+      SelectMarketCenterEvent event, Emitter<MainState> emit) async {
+    emit(state.copyWith(selectedMarketCenter: event.marketCenter));
+  }
+
+  /// выбор дня недели
+  Future<void> _onSelectDayEvent(
+      SelectDayEvent event, Emitter<MainState> emit) async {
+    emit(state.copyWith(weekDay: event.day));
+    Get.find<RoutersRepository>().selectDay(event.day);
+
+    emit(state.copyWith(
+      todayRouters: Get.find<RoutersRepository>().todayRouters,
+      selectedMarketCenter: Get.find<RoutersRepository>().todayRouters.first,
+    ));
+  }
+
+  /// загрузка данных из RoutersRepository
+  Future<void> _onLoadRoutersEvent(
+      LoadRoutersEvent event, Emitter<MainState> emit) async {
+    emit(state.copyWith(
+      marketCenters: Get.find<RoutersRepository>().marketCenters,
+      todayRouters: Get.find<RoutersRepository>().todayRouters,
+    ));
+  }
+
+  /// обновление списка маршрутов
+  Future<void> _onUpdateWeekRoutersEvent(
+      UpdateWeekRoutersEvent event, Emitter<MainState> emit) async {
+    List<MarketCenter> todayRouters =
+        Get.find<RoutersRepository>().getMarketCentersForDay(day: event.day);
+    emit(state.copyWith(
+      todayRouters: todayRouters,
+    ));
   }
 
   /// удаление сессии
@@ -99,9 +145,13 @@ class MainBloc extends Bloc<MainEvent, MainState> {
       await Future.delayed(const Duration(seconds: 6));
       emit(state.copyWith(error: ''));
     } else {
+      Get.find<RoutersRepository>()
+          .removeMarketCenter(state.selectedMarketCenter);
       emit(state.copyWith(
-          dayHystorySession: repo.lastDay,
-          curSession: repo.lastDay.listSessions.last));
+        dayHystorySession: repo.lastDay,
+        curSession: repo.lastDay.listSessions.last,
+        todayRouters: Get.find<RoutersRepository>().todayRouters,
+      ));
     }
   }
 

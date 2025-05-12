@@ -7,6 +7,7 @@ import 'package:tdtime/domain/models/user.dart';
 import 'package:flutter_easylogger/flutter_logger.dart';
 import 'package:get/get.dart';
 import 'package:tdtime/domain/repository/routers_repository.dart';
+import 'package:tdtime/presentation/screens/main/bloc/main_bloc.dart';
 
 /// репо для юзера
 class UserRepository {
@@ -155,7 +156,10 @@ class UserRepository {
   /// авторизация пользователя
   authUser({required User userIn}) async {
     user = userIn;
+
+    /// после авторизации загружаем данные из RoutersRepository
     await Get.find<RoutersRepository>().init();
+    Get.find<MainBloc>().add(LoadRoutersEvent());
     saveUserToLocal();
   }
 

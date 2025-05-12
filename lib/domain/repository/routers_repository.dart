@@ -20,37 +20,62 @@ class RoutersRepository {
   // Хранилище маршрутов по дням недели
   List<WeekRouters> weekRouters = [];
 
+  // Хранилище точек на сегодня
+  List<MarketCenter> todayRouters = [];
+
   // Инициализация данных
   Future<void> init() async {
     final user = Get.find<UserRepository>().user;
     if (user.id.isEmpty) {
-      Logger.i('User not registered yet, skipping data loading');
       return;
     }
-
-    Logger.i('Starting data initialization for user ${user.id}');
     try {
       // Пытаемся загрузить данные из FTP
-      Logger.i('Attempting to load data from FTP...');
       await _loadFromFtp();
-      Logger.i('Successfully loaded data from FTP');
     } catch (e) {
-      Logger.e('Failed to load from FTP: $e');
       // Если не получилось, пробуем из локальных файлов
       try {
-        Logger.i('Attempting to load data from local storage...');
         await _loadFromLocal();
-        Logger.i('Successfully loaded data from local storage');
       } catch (e) {
-        Logger.e('Failed to load from local: $e');
         // Если и локальных нет, берем из моковых
-        Logger.i('Loading mock data...');
         await _loadFromMock();
-        Logger.i('Successfully loaded and saved mock data');
       }
     }
-    Logger.i(
-        'Data initialization completed. Loaded ${marketCenters.length} market centers and ${weekRouters.length} routes');
+    await _loadTodayRouters();
+  }
+
+  /// Выбор дня
+  Future<void> selectDay(WeekDay day) async {
+    todayRouters = getMarketCentersForDay(day: day);
+    await _saveTodayRouters();
+  }
+
+  // загрузка точек на сегодня
+  Future<void> _loadTodayRouters() async {
+    final user = Get.find<UserRepository>().user;
+    if (user.id.isEmpty) return;
+
+    try {
+      // Загружаем список ТЦ
+      final ttData =
+          await LocalData.loadListJson(key: LocalDataKey.todayRouters);
+      if (ttData.isNotEmpty && ttData.first['error'] == null) {
+        todayRouters = ttData.map((mc) => MarketCenter.fromJson(mc)).toList();
+        Logger.i('todayRouters: ${todayRouters.length}');
+      } else {
+        await _saveTodayRouters();
+      }
+    } catch (e) {
+      await _saveTodayRouters();
+      Logger.e('Failed to load today routers: $e');
+    }
+  }
+
+  // сохранение точек на сегодня
+  Future<void> _saveTodayRouters() async {
+    await LocalData.saveListJson(
+        json: todayRouters.map((mc) => mc.toJson()).toList(),
+        key: LocalDataKey.todayRouters);
   }
 
   // Загрузка данных из FTP
@@ -68,9 +93,19 @@ class RoutersRepository {
       // Загружаем маршруты
       final routersData =
           await Api().downloadJsonFile('${user.id}_routers.json');
-      weekRouters = (routersData['routers'] as List)
-          .map((r) => WeekRouters.fromJson(r))
-          .toList();
+      weekRouters = (routersData['routers'] as List).map((r) {
+        final ids =
+            (r['marketCenterIds'] as List).map((id) => id.toString()).toList();
+        final centers = ids
+            .map((id) => marketCenters.firstWhere((mc) => mc.id == id,
+                orElse: () => MarketCenter.init()))
+            .toList();
+        return WeekRouters(
+          day: WeekDay.values.firstWhere((e) => e.name == r['day']),
+          marketCenterIds: ids,
+          marketCenters: centers,
+        );
+      }).toList();
 
       // Если данные успешно загружены, сохраняем их локально
       if (marketCenters.isNotEmpty && weekRouters.isNotEmpty) {
@@ -110,6 +145,9 @@ class RoutersRepository {
             marketCenterIds: (r['marketCenterIds'] as List)
                 .map((id) => id.toString())
                 .toList(),
+            marketCenters: (r['marketCenters'] as List)
+                .map((mc) => MarketCenter.fromJson(mc))
+                .toList(),
           );
         }).toList();
       }
@@ -137,6 +175,9 @@ class RoutersRepository {
         ),
         marketCenterIds: (route['marketCenterIds'] as List)
             .map((id) => id.toString())
+            .toList(),
+        marketCenters: (route['marketCenters'] as List)
+            .map((mc) => MarketCenter.fromJson(mc))
             .toList(),
       );
     }).toList();
@@ -234,7 +275,8 @@ class RoutersRepository {
   }
 
   // Получение списка торговых центров для конкретного дня
-  List<MarketCenter> getMarketCentersForDay(WeekDay day) {
+  List<MarketCenter> getMarketCentersForDay({WeekDay? day}) {
+    day ??= getCurrentDay();
     final route = getRoutersByDay(day);
     if (route == null) return [];
 
@@ -243,10 +285,10 @@ class RoutersRepository {
     }).toList();
   }
 
-  // Получение списка торговых центров для текущего дня
-  List<MarketCenter> getMarketCentersForCurrentDay() {
+  /// получение текущего дня недели
+  WeekDay getCurrentDay() {
     final now = DateTime.now();
     final currentDay = WeekDay.values[now.weekday - 1];
-    return getMarketCentersForDay(currentDay);
+    return currentDay;
   }
 }

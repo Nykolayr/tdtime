@@ -7,7 +7,9 @@ import 'package:get/get.dart';
 import 'package:go_router/go_router.dart';
 import 'package:qr_code_scanner/qr_code_scanner.dart';
 import 'package:tdtime/domain/models/hystory_sessions.dart';
+import 'package:tdtime/domain/models/market_center.dart';
 import 'package:tdtime/domain/models/session.dart';
+import 'package:tdtime/domain/models/week_routers.dart';
 import 'package:tdtime/presentation/screens/main/bloc/main_bloc.dart';
 import 'package:tdtime/presentation/screens/main/get_position.dart';
 import 'package:tdtime/presentation/screens/main/widget.dart';
@@ -15,6 +17,7 @@ import 'package:tdtime/presentation/screens/scan/qr_code_scan.dart';
 import 'package:tdtime/presentation/theme/theme.dart';
 import 'package:tdtime/presentation/widgets/app_bar.dart';
 import 'package:tdtime/presentation/widgets/buttons.dart';
+import 'package:tdtime/presentation/widgets/universal_dropdown.dart';
 
 class MainScanPage extends StatefulWidget {
   const MainScanPage({Key? key}) : super(key: key);
@@ -29,6 +32,8 @@ class MainScanPageState extends State<MainScanPage> {
   String error = '';
   bool isLoading = false;
   late Barcode result;
+  WeekDay selectedDay = WeekDay.values[DateTime.now().weekday - 1];
+
   @override
   void initState() {
     super.initState();
@@ -53,59 +58,36 @@ class MainScanPageState extends State<MainScanPage> {
     super.dispose();
   }
 
-  void startScanning() async {
-    await Navigator.push(
-      context,
-      MaterialPageRoute(
-          builder: (context) => ScanScreen(onScan: (Barcode scanResult) {
-                result = scanResult;
-              })),
-    );
+  void startSession() async {
+    isLoading = true;
+    setState(() {});
+    Position position = Position.fromMap({
+      'latitude': 0.0,
+      'longitude': 0.0,
+      'accuracy': 0.0,
+      'altitude': 0.0,
+      'altitudeAccuracy': 0.0,
+      'heading': 0.0,
+      'speed': 0.0,
+      'speedAccuracy': 0.0,
+      'timestamp': 0,
+    });
+    try {
+      position = await determinePosition().timeout(const Duration(seconds: 3));
+    } catch (e) {
+      Logger.e('Ошибка при определения местоположения $e');
+    } finally {
+      isLoading = false;
+      setState(() {});
+    }
 
-    if (result.code == null) {
-      error = 'Ошибка сканирования';
-      setState(() {});
-    } else {
-      if (result.format == BarcodeFormat.dataMatrix) {
-        error = 'Это неправильный формат! ';
-        setState(() {});
-      } else {
-        isLoading = true;
-        setState(() {});
-        Position position = Position.fromMap({
-          'latitude': 0.0,
-          'longitude': 0.0,
-          'accuracy': 0.0,
-          'altitude': 0.0,
-          'altitudeAccuracy': 0.0,
-          'heading': 0.0,
-          'speed': 0.0,
-          'speedAccuracy': 0.0,
-          'timestamp': 0,
-        });
-        try {
-          position =
-              await determinePosition().timeout(const Duration(seconds: 3));
-        } catch (e) {
-          // error =
-          //     'Ошибка при определения местоположения, будет использован нулевой адрес';
-          Logger.e('Ошибка при определения местоположения $e');
-        } finally {
-          isLoading = false;
-          setState(() {});
-        }
-        Logger.i('result >>. ${result.code} === ${position.toJson()}');
-        bloc.add(BeginSessinonEvent(id: result.code!, position: position));
-        await Future.delayed(const Duration(milliseconds: 100));
-        if (bloc.state.error.isEmpty && error.isEmpty) {
-          if (mounted) {
-            context.go('/main/matrix');
-          }
-        }
+    bloc.add(BeginSessinonEvent(
+        id: bloc.state.selectedMarketCenter.id, position: position));
+    await Future.delayed(const Duration(milliseconds: 100));
+    if (bloc.state.error.isEmpty && error.isEmpty) {
+      if (mounted) {
+        context.go('/main/matrix');
       }
-      await Future.delayed(const Duration(seconds: 6));
-      error = '';
-      setState(() {});
     }
   }
 
@@ -148,15 +130,57 @@ class MainScanPageState extends State<MainScanPage> {
                           ),
                         ),
                 ),
+                if (state.dayHystorySession.listSessions.isEmpty)
+                  Positioned(
+                    bottom: 150,
+                    left: 20,
+                    right: 20,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (state.todayRouters.isEmpty)
+                          UniversalDropdown<WeekDay>(
+                            items: WeekDay.values,
+                            value: selectedDay,
+                            onChanged: (day) {
+                              if (day != null) {
+                                setState(() => selectedDay = day);
+                              }
+                            },
+                            label: 'Выберите день недели',
+                            itemToString: (day) => day.title,
+                          ),
+                        if (state.todayRouters.isNotEmpty)
+                          UniversalDropdown<MarketCenter>(
+                            items: state.todayRouters,
+                            value: state.selectedMarketCenter,
+                            onChanged: (mc) {
+                              if (mc != null) {
+                                bloc.add(
+                                    SelectMarketCenterEvent(marketCenter: mc));
+                              }
+                            },
+                            label: 'Выберите торговую точку',
+                            itemToString: (mc) => mc.name,
+                          ),
+                      ],
+                    ),
+                  ),
                 Positioned(
                   bottom: 10,
                   left: 20,
                   child: Column(
                     children: [
                       ButtonWide(
-                        text: 'Добавить торговую точку',
+                        text: 'Дальше',
                         iconPath: 'assets/svg/reader.svg',
-                        onPressed: startScanning,
+                        onPressed: () {
+                          if (state.todayRouters.isEmpty) {
+                            bloc.add(SelectDayEvent(day: selectedDay));
+                          } else {
+                            startSession();
+                          }
+                        },
                       ),
                       const Gap(5),
                       if (state.dayHystorySession.listSessions.isNotEmpty) ...[

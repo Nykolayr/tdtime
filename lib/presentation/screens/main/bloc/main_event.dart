@@ -7,6 +7,27 @@ sealed class MainEvent extends Equatable {
   List<Object> get props => [];
 }
 
+/// выбор торговой точки
+class SelectMarketCenterEvent extends MainEvent {
+  final MarketCenter marketCenter;
+  const SelectMarketCenterEvent({required this.marketCenter});
+}
+
+/// загрузка данных из RoutersRepository
+class LoadRoutersEvent extends MainEvent {}
+
+/// обновление списка маршрутов по дню недели
+class UpdateWeekRoutersEvent extends MainEvent {
+  final WeekDay day;
+  const UpdateWeekRoutersEvent({required this.day});
+}
+
+/// выбор дня недели
+class SelectDayEvent extends MainEvent {
+  final WeekDay day;
+  const SelectDayEvent({required this.day});
+}
+
 /// начало сессии
 class BeginSessinonEvent extends MainEvent {
   final String id;
