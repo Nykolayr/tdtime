@@ -177,8 +177,11 @@ class RoutersRepository {
           marketCenters: centers,
         );
       }).toList();
+      Logger.i('weekRouters: ${weekRouters.length}');
+      todayRouters = getMarketCentersForDay(day: getCurrentDay());
       Get.find<UserRepository>().user.filePath = fileName;
       Get.find<UserRepository>().saveUserToLocal();
+      await _saveToLocal();
       isFileExist = true;
       errorMessage = '';
       return '';

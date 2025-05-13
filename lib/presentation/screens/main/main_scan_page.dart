@@ -47,8 +47,6 @@ class MainScanPageState extends State<MainScanPage> {
   }
 
   void checkError() async {
-    Logger.i(
-        'initState ${bloc.state.errorShowMessage} ${Get.find<RoutersRepository>().errorMessage}');
     if (bloc.state.errorShowMessage.isNotEmpty ||
         Get.find<RoutersRepository>().errorMessage.isNotEmpty) {
       if (bloc.state.errorShowMessage.contains('all_tt')) {
