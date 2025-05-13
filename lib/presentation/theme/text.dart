@@ -49,6 +49,12 @@ class AppText {
     fontSize: 14,
   );
 
+  static const TextStyle text12 = TextStyle(
+    color: AppColor.white,
+    fontWeight: FontWeight.w400,
+    fontSize: 12,
+  );
+
   static const TextStyle text14b = TextStyle(
     color: AppColor.black,
     fontWeight: FontWeight.w500,

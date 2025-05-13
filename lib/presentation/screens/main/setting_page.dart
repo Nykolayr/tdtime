@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:gap/gap.dart';
 import 'package:get/get.dart';
 import 'package:go_router/go_router.dart';
@@ -12,6 +13,7 @@ import 'package:tdtime/presentation/screens/scan/qr_code_scan.dart';
 import 'package:tdtime/presentation/theme/theme.dart';
 import 'package:tdtime/presentation/widgets/app_bar.dart';
 import 'package:tdtime/presentation/widgets/buttons.dart';
+import 'package:tdtime/presentation/widgets/row_with_filepath.dart';
 import 'package:tdtime/presentation/widgets/text_field2.dart';
 
 class SettingsPage extends StatefulWidget {
@@ -28,6 +30,7 @@ class SettingsPageState extends State<SettingsPage> {
   final patronController = TextEditingController();
   final formKey = GlobalKey<FormState>();
   AuthBloc bloc = Get.find<AuthBloc>();
+  MainBloc mainBloc = Get.find<MainBloc>();
   bool isEdit = false;
   String error = '';
   late Barcode result;
@@ -118,7 +121,7 @@ class SettingsPageState extends State<SettingsPage> {
               children: [
                 const Text(
                     'Будьте бдительны при заполнении данных! В случае, если у вас возникли проблемы при эксплуатации данного приложения —пожалуйста, уведомите об этом старшего сотрудника, для скорейшего устранения выявляенных проблем.',
-                    style: AppText.text14),
+                    style: AppText.text10),
                 const Gap(15),
                 BestFormField(
                   iconPath: 'assets/svg/account.svg',
@@ -157,6 +160,8 @@ class SettingsPageState extends State<SettingsPage> {
                   isCapitalization: false,
                   readOnly: !isEdit,
                 ),
+                const Gap(8),
+                RowWithFilePath(mainBloc: mainBloc),
                 if (error.isNotEmpty)
                   Container(
                     height: 45,
@@ -204,7 +209,7 @@ class SettingsPageState extends State<SettingsPage> {
                   text: 'Выйти из приложения',
                   iconPath: 'assets/svg/exit.svg',
                   onPressed: () {
-                    Get.find<MainBloc>().add(ExitUserEvent());
+                    mainBloc.add(ExitUserEvent());
                     context.go('/splash');
                   },
                 ),
@@ -213,7 +218,7 @@ class SettingsPageState extends State<SettingsPage> {
                   text: 'Удалить аккаунт',
                   iconPath: 'assets/svg/trash.svg',
                   onPressed: () {
-                    Get.find<MainBloc>().add(ExitUserEvent());
+                    mainBloc.add(ExitUserEvent());
                     context.go('/splash');
                   },
                 ),
@@ -223,6 +228,71 @@ class SettingsPageState extends State<SettingsPage> {
           ),
         ),
       ),
+    );
+  }
+}
+
+class EditFileNameModal extends StatefulWidget {
+  final String initialName;
+  final void Function(String) onCheck;
+
+  const EditFileNameModal({
+    Key? key,
+    required this.initialName,
+    required this.onCheck,
+  }) : super(key: key);
+
+  @override
+  State<EditFileNameModal> createState() => _EditFileNameModalState();
+}
+
+class _EditFileNameModalState extends State<EditFileNameModal> {
+  late TextEditingController controller;
+  bool isLoading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    controller = TextEditingController(text: widget.initialName);
+  }
+
+  @override
+  void dispose() {
+    controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      title: const Text('Изменить имя файла'),
+      content: TextField(
+        controller: controller,
+        decoration: const InputDecoration(
+          labelText: 'Имя файла (без .json)',
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Закрыть'),
+        ),
+        ElevatedButton(
+          onPressed: isLoading
+              ? null
+              : () async {
+                  setState(() => isLoading = true);
+                  widget.onCheck(controller.text);
+                },
+          child: isLoading
+              ? const SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2))
+              : const Text('Проверить'),
+        ),
+      ],
     );
   }
 }

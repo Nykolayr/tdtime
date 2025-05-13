@@ -30,6 +30,16 @@ class MainBloc extends Bloc<MainEvent, MainState> {
     on<ShowErrorEvent>(_onShowErrorEvent);
     on<LoadMarketCentersEvent>(_onLoadMarketCentersEvent);
     on<ResetErrorEvent>(_onResetErrorEvent);
+    on<NewFileEvent>(_onNewFileEvent);
+  }
+
+  /// новый файл
+  Future<void> _onNewFileEvent(
+      NewFileEvent event, Emitter<MainState> emit) async {
+    emit(state.copyWith(
+      isFileExist: event.isFileExist,
+      filePath: event.fileName,
+    ));
   }
 
   /// сброс ошибки
@@ -42,21 +52,30 @@ class MainBloc extends Bloc<MainEvent, MainState> {
   Future<void> _onLoadMarketCentersEvent(
       LoadMarketCentersEvent event, Emitter<MainState> emit) async {
     RoutersRepository repo = Get.find<RoutersRepository>();
-    emit(state.copyWith(isLoading: true));
-    String answer = await repo.loadFromFtpTT('all_tt.json');
-    emit(state.copyWith(
-      isLoading: false,
-      isFileExist: repo.isFileExist,
-      filePath: repo.filePath,
-      marketCenters: repo.marketCenters,
-      todayRouters: repo.todayRouters,
-      selectedMarketCenter: repo.todayRouters.isNotEmpty
-          ? repo.todayRouters.first
-          : MarketCenter.init(),
-    ));
-    if (answer.isNotEmpty) {
-      emit(state.copyWith(error: answer));
-      await Future.delayed(const Duration(seconds: 5));
+    emit(state.copyWith(isLoading: true, isFileExist: false));
+    String answer = await repo.loadFromFtpTT(event.fileName);
+    emit(state.copyWith(isLoading: false));
+    Logger.e('answer: $answer');
+    if (answer.isEmpty) {
+      emit(state.copyWith(
+        isFileExist: repo.isFileExist,
+        filePath: Get.find<UserRepository>().user.filePath,
+        marketCenters: repo.marketCenters,
+        todayRouters: repo.todayRouters,
+        selectedMarketCenter: repo.todayRouters.isNotEmpty
+            ? repo.todayRouters.first
+            : MarketCenter.init(),
+        errorShowMessage: '',
+      ));
+    } else {
+      emit(state.copyWith(
+        error: answer,
+        isFileExist: false,
+        filePath: event.fileName,
+        errorShowMessage:
+            'Такого файла ${event.fileName} не существует, спросите у администратора название файла и поменяйте его в настройках!',
+      ));
+      await Future.delayed(const Duration(seconds: 8));
       emit(state.copyWith(error: ''));
     }
   }

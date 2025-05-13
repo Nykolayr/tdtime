@@ -11,6 +11,7 @@ import 'package:tdtime/domain/models/market_center.dart';
 import 'package:tdtime/domain/models/session.dart';
 import 'package:tdtime/domain/models/week_routers.dart';
 import 'package:tdtime/domain/repository/routers_repository.dart';
+import 'package:tdtime/domain/repository/user_repository.dart';
 import 'package:tdtime/presentation/screens/main/bloc/main_bloc.dart';
 import 'package:tdtime/presentation/screens/main/get_position.dart';
 import 'package:tdtime/presentation/screens/main/widget.dart';
@@ -40,34 +41,35 @@ class MainScanPageState extends State<MainScanPage> {
   @override
   void initState() {
     super.initState();
-    if (bloc.state.errorShowMessage.isNotEmpty) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      checkError();
+    });
+  }
+
+  void checkError() async {
+    Logger.i(
+        'initState ${bloc.state.errorShowMessage} ${Get.find<RoutersRepository>().errorMessage}');
+    if (bloc.state.errorShowMessage.isNotEmpty ||
+        Get.find<RoutersRepository>().errorMessage.isNotEmpty) {
       if (bloc.state.errorShowMessage.contains('all_tt')) {
-        showModalContent(
+        await showErrorAlert(
           context,
-          'Внимание!',
-          const Text(
-              'У вас нет доступа к списку торговых точек, попробовать еще раз  загрузить?'),
-          () {
+          'У вас нет доступа к списку торговых точек, попробовать еще раз  загрузить?',
+          onOk: () {
             bloc.add(ResetErrorEvent());
             Get.find<RoutersRepository>().init();
             Navigator.of(context).pop();
           },
-          () {
-            Navigator.of(context).pop();
-          },
         );
       } else {
-        showModalContent(
+        bloc.add(NewFileEvent(
+          fileName: Get.find<UserRepository>().user.filePath,
+          isFileExist: Get.find<RoutersRepository>().isFileExist,
+        ));
+        await showErrorAlert(
           context,
-          'Внимание!',
-          Text(
-              'Такого файла ${Get.find<RoutersRepository>().filePath} не существует, поменять файл в настройках?'),
-          () {
-            Navigator.of(context).pop();
-            widget.onTabChange(1);
-          },
-          () {
-            Navigator.of(context).pop();
+          'Такого файла ${Get.find<UserRepository>().user.filePath} не существует, спросите у администратора название файла и поменяйте его в настройках!',
+          onOk: () {
             widget.onTabChange(1);
           },
         );
@@ -131,9 +133,6 @@ class MainScanPageState extends State<MainScanPage> {
   Widget build(BuildContext context) {
     return BlocBuilder<MainBloc, MainState>(
         bloc: bloc,
-        buildWhen: (previous, current) {
-          return true;
-        },
         builder: (context, state) {
           return Scaffold(
             extendBodyBehindAppBar: true,

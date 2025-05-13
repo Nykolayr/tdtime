@@ -20,7 +20,8 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
         family: event.family,
         name: event.name,
         patron: event.patron,
-        id: event.id);
+        id: event.id,
+        filePath: '${event.id}_routers');
 
     await Get.find<UserRepository>().authUser(userIn: user);
     emit(state.copyWith(

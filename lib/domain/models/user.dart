@@ -5,12 +5,14 @@ class User {
   String family; // фамилия
   String name; // имя
   String patron; // отчество
+  String filePath; // путь к файлу
 
   User({
     required this.id,
     required this.family,
     required this.patron,
     required this.name,
+    required this.filePath,
   });
   factory User.fromJson(Map<String, dynamic> data) {
     return User(
@@ -18,6 +20,7 @@ class User {
       family: data['family'] ?? '',
       name: data['name'] ?? '',
       patron: data['patron'] ?? '',
+      filePath: data['filePath'] ?? '${data['id']}_routers',
     );
   }
 
@@ -27,6 +30,7 @@ class User {
       family: '',
       name: '',
       patron: '',
+      filePath: '',
     );
   }
 
@@ -36,6 +40,7 @@ class User {
       'family': family,
       'name': name,
       'patron': patron,
+      'filePath': filePath,
     };
   }
 }

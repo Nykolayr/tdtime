@@ -7,11 +7,21 @@ sealed class MainEvent extends Equatable {
   List<Object> get props => [];
 }
 
+/// новый файл
+class NewFileEvent extends MainEvent {
+  final String fileName;
+  final bool isFileExist;
+  const NewFileEvent({required this.fileName, required this.isFileExist});
+}
+
 /// сброс ошибки
 class ResetErrorEvent extends MainEvent {}
 
 /// загрузка списка ТЦ
-class LoadMarketCentersEvent extends MainEvent {}
+class LoadMarketCentersEvent extends MainEvent {
+  final String fileName;
+  const LoadMarketCentersEvent({required this.fileName});
+}
 
 /// показ ошибки
 class ShowErrorEvent extends MainEvent {

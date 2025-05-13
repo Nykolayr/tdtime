@@ -70,7 +70,7 @@ class EmptySession extends StatelessWidget {
         const Gap(70),
         const Text(
             'Будьте бдительны при заполнении данных! В случае, если у вас возникли проблемы при эксплуатации данного приложения —пожалуйста, уведомите об этом старшего сотрудника, для скорейшего устранения выявляенных проблем.',
-            style: AppText.text14),
+            style: AppText.text10),
         const Gap(50),
         Center(
             child: SvgPicture.asset('assets/svg/scan_icon.svg',

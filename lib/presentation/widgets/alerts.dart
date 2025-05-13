@@ -41,6 +41,48 @@ class AlertSelf extends StatelessWidget {
   }
 }
 
+/// Алерт для ошибок
+Future<void> showErrorAlert(
+  BuildContext context,
+  String errorMessage, {
+  String buttonText = 'ОК',
+  VoidCallback? onOk,
+}) async {
+  return showDialog<void>(
+    context: context,
+    builder: (BuildContext context) {
+      return AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(25.0),
+        ),
+        alignment: Alignment.center,
+        actionsAlignment: MainAxisAlignment.center,
+        actionsPadding: const EdgeInsets.only(bottom: 20),
+        title: Center(
+          child: Text(
+            'Внимание!',
+            style: AppText.title18.copyWith(color: AppColor.redPro),
+          ),
+        ),
+        content: Text(
+          errorMessage,
+          style: AppText.table12,
+          textAlign: TextAlign.center,
+        ),
+        actions: <Widget>[
+          Buttons.alert(
+            text: buttonText,
+            onPressed: () {
+              Navigator.of(context).pop();
+              if (onOk != null) onOk();
+            },
+          ),
+        ],
+      );
+    },
+  );
+}
+
 /// Для показа кастомного содержимого
 Future<void> showModalContent(BuildContext context, String text, Widget child,
     Function() cansel, Function() save,

@@ -77,9 +77,9 @@ class MainState extends Equatable {
             Get.find<RoutersRepository>().todayRouters.isNotEmpty
                 ? Get.find<RoutersRepository>().todayRouters.first
                 : MarketCenter.init(),
-        filePath: '',
+        filePath: Get.find<UserRepository>().user.filePath,
         isFileExist: false,
-        errorShowMessage: '',
+        errorShowMessage: Get.find<RoutersRepository>().errorMessage,
       );
 
   @override
@@ -91,5 +91,7 @@ class MainState extends Equatable {
         marketCenters,
         todayRouters,
         errorShowMessage,
+        filePath,
+        isFileExist,
       ];
 }

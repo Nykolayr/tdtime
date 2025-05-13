@@ -15,22 +15,27 @@ class MainPage extends StatefulWidget {
 
 class MainPageState extends State<MainPage> {
   int selectedIndex = 0;
-  late final List<Widget> pages;
-  final PageController pageController =
-      PageController(); // Контроллер для PageView
+  final PageController pageController = PageController();
+  late List<Widget> pages;
 
   void onItemTapped(int index) {
     setState(() {
-      selectedIndex = index; // Обновляем индекс выбранного таба
+      selectedIndex = index;
     });
-    pageController.animateToPage(index, // Используем animateToPage для анимации
-        duration: const Duration(milliseconds: 200), // Длительность анимации
-        curve: Curves.easeInOut); // Кривая анимации
+    pageController.animateToPage(
+      index,
+      duration: const Duration(milliseconds: 200),
+      curve: Curves.easeInOut,
+    );
   }
 
   @override
   void initState() {
     super.initState();
+    pages = [
+      MainScanPage(onTabChange: onItemTapped),
+      SettingsPage(),
+    ];
   }
 
   @override

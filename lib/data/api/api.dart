@@ -99,7 +99,6 @@ class Api {
       ftpConnect.supportIPV6 = true;
       await ftpConnect.changeDirectory('user_app');
       await ftpConnect.changeDirectory('routes');
-
       // Создаем временный файл
       final directory = await getTemporaryDirectory();
       final tempFile = File('${directory.path}/$fileName');
