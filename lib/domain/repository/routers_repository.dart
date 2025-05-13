@@ -1,4 +1,5 @@
 import 'package:get/get.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:tdtime/data/api/api.dart';
 import 'package:tdtime/data/mock/routers_mock.dart';
@@ -29,19 +30,43 @@ class RoutersRepository {
     if (user.id.isEmpty) {
       return;
     }
+
     try {
-      // Пытаемся загрузить данные из FTP
       await _loadFromFtp();
     } catch (e) {
-      // Если не получилось, пробуем из локальных файлов
       try {
         await _loadFromLocal();
       } catch (e) {
-        // Если и локальных нет, берем из моковых
         await _loadFromMock();
       }
     }
-    await _loadTodayRouters();
+
+    final today = getCurrentDay();
+    final lastOpened = await loadLastOpenedWeekDay();
+
+    if (lastOpened == null || lastOpened != today) {
+      // Новый день — обновляем todayRouters из weekRouters
+      todayRouters = getMarketCentersForDay(day: today);
+      await _saveTodayRouters();
+      await saveLastOpenedWeekDay(today);
+      Logger.i('Новый день: todayRouters обновлены из weekRouters');
+    } else {
+      // День тот же — todayRouters из локалки
+      final saved =
+          await LocalData.loadListJson(key: LocalDataKey.todayRouters);
+      if (saved.isNotEmpty && saved.first['error'] == null) {
+        todayRouters = saved.map((mc) => MarketCenter.fromJson(mc)).toList();
+      } else {
+        todayRouters = getMarketCentersForDay(day: today);
+      }
+      Logger.i('Тот же день: todayRouters из локалки');
+    }
+  }
+
+  /// убираем выбранный ТЦ из списка точек на сегодня
+  void removeMarketCenter(MarketCenter marketCenter) {
+    todayRouters.remove(marketCenter);
+    _saveTodayRouters();
   }
 
   /// Выбор дня
@@ -51,7 +76,7 @@ class RoutersRepository {
   }
 
   // загрузка точек на сегодня
-  Future<void> _loadTodayRouters() async {
+  Future<void> loadTodayRouters() async {
     final user = Get.find<UserRepository>().user;
     if (user.id.isEmpty) return;
 
@@ -74,8 +99,9 @@ class RoutersRepository {
   // сохранение точек на сегодня
   Future<void> _saveTodayRouters() async {
     await LocalData.saveListJson(
-        json: todayRouters.map((mc) => mc.toJson()).toList(),
-        key: LocalDataKey.todayRouters);
+      json: todayRouters.map((mc) => mc.toJson()).toList(),
+      key: LocalDataKey.todayRouters,
+    );
   }
 
   // Загрузка данных из FTP
@@ -290,5 +316,20 @@ class RoutersRepository {
     final now = DateTime.now();
     final currentDay = WeekDay.values[now.weekday - 1];
     return currentDay;
+  }
+
+  // --- Методы для lastOpenedWeekDay ---
+  Future<void> saveLastOpenedWeekDay(WeekDay day) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt('lastOpenedWeekDay', day.index);
+  }
+
+  Future<WeekDay?> loadLastOpenedWeekDay() async {
+    final prefs = await SharedPreferences.getInstance();
+    final idx = prefs.getInt('lastOpenedWeekDay');
+    if (idx != null && idx >= 0 && idx < WeekDay.values.length) {
+      return WeekDay.values[idx];
+    }
+    return null;
   }
 }

@@ -1,4 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_easylogger/flutter_logger.dart';
+import 'package:gap/gap.dart';
+import 'package:tdtime/domain/models/market_center.dart';
+import 'package:tdtime/presentation/theme/theme.dart';
 
 class UniversalDropdown<T> extends StatelessWidget {
   final List<T> items;
@@ -18,11 +22,19 @@ class UniversalDropdown<T> extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (value is MarketCenter) {
+      for (var item in items) {
+        print('item: ${(item as MarketCenter).toJson()}');
+      }
+
+      Logger.i(
+          'items: ${items.length}   value: ${(value as MarketCenter).toJson()}');
+    }
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: const TextStyle(fontWeight: FontWeight.bold)),
-        const SizedBox(height: 8),
+        Text(label, style: AppText.medium14),
+        const Gap(10),
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
           decoration: BoxDecoration(

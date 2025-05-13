@@ -15,13 +15,18 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
   /// авторизация по логину и паролю
   Future<void> _onAuthEvent(
       AuthUserEvent event, Emitter<AuthState> emit) async {
+    emit(state.copyWith(isLoading: true, isSucsess: false));
     User user = User(
         family: event.family,
         name: event.name,
         patron: event.patron,
         id: event.id);
 
-    Get.find<UserRepository>().authUser(userIn: user);
-    emit(state.copyWith(user: user));
+    await Get.find<UserRepository>().authUser(userIn: user);
+    emit(state.copyWith(
+      user: user,
+      isSucsess: true,
+      isLoading: false,
+    ));
   }
 }

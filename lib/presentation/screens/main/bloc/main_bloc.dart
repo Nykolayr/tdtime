@@ -39,10 +39,12 @@ class MainBloc extends Bloc<MainEvent, MainState> {
   /// выбор дня недели
   Future<void> _onSelectDayEvent(
       SelectDayEvent event, Emitter<MainState> emit) async {
-    emit(state.copyWith(weekDay: event.day));
+    emit(state.copyWith(weekDay: event.day, isLoading: true));
     Get.find<RoutersRepository>().selectDay(event.day);
-
+    Logger.i(
+        'todayRouters: ${Get.find<RoutersRepository>().todayRouters.length}');
     emit(state.copyWith(
+      isLoading: false,
       todayRouters: Get.find<RoutersRepository>().todayRouters,
       selectedMarketCenter: Get.find<RoutersRepository>().todayRouters.first,
     ));
@@ -51,9 +53,13 @@ class MainBloc extends Bloc<MainEvent, MainState> {
   /// загрузка данных из RoutersRepository
   Future<void> _onLoadRoutersEvent(
       LoadRoutersEvent event, Emitter<MainState> emit) async {
+    RoutersRepository repo = Get.find<RoutersRepository>();
     emit(state.copyWith(
-      marketCenters: Get.find<RoutersRepository>().marketCenters,
-      todayRouters: Get.find<RoutersRepository>().todayRouters,
+      marketCenters: repo.marketCenters,
+      todayRouters: repo.todayRouters,
+      selectedMarketCenter: repo.todayRouters.isNotEmpty
+          ? repo.todayRouters.first
+          : MarketCenter.init(),
     ));
   }
 
@@ -137,20 +143,26 @@ class MainBloc extends Bloc<MainEvent, MainState> {
   /// начало сессии
   Future<void> _onBeginSessinonEvent(
       BeginSessinonEvent event, Emitter<MainState> emit) async {
-    UserRepository repo = Get.find<UserRepository>();
+    UserRepository repoUser = Get.find<UserRepository>();
+    RoutersRepository repoRouters = Get.find<RoutersRepository>();
     String answer =
-        repo.addHystorySessions(id: event.id, position: event.position);
+        repoUser.addHystorySessions(id: event.id, position: event.position);
     if (answer.isNotEmpty) {
       emit(state.copyWith(error: answer));
       await Future.delayed(const Duration(seconds: 6));
       emit(state.copyWith(error: ''));
     } else {
-      Get.find<RoutersRepository>()
-          .removeMarketCenter(state.selectedMarketCenter);
+      MarketCenter marketCenter = MarketCenter.init();
+      if (repoRouters.todayRouters.isNotEmpty) {
+        repoRouters.removeMarketCenter(state.selectedMarketCenter);
+        marketCenter = repoRouters.todayRouters.first;
+      }
+
       emit(state.copyWith(
-        dayHystorySession: repo.lastDay,
-        curSession: repo.lastDay.listSessions.last,
-        todayRouters: Get.find<RoutersRepository>().todayRouters,
+        dayHystorySession: repoUser.lastDay,
+        curSession: repoUser.lastDay.listSessions.last,
+        todayRouters: repoRouters.todayRouters,
+        selectedMarketCenter: marketCenter,
       ));
     }
   }
@@ -204,8 +216,9 @@ class MainBloc extends Bloc<MainEvent, MainState> {
       emit(state.copyWith(error: ''));
     } else {
       emit(state.copyWith(
-          dayHystorySession: repo.lastDay,
-          curSession: repo.lastDay.listSessions.last));
+        dayHystorySession: repo.lastDay,
+        curSession: repo.lastDay.listSessions.last,
+      ));
     }
   }
 }

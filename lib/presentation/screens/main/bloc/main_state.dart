@@ -61,7 +61,10 @@ class MainState extends Equatable {
         marketCenters: Get.find<RoutersRepository>().marketCenters,
         todayRouters: Get.find<RoutersRepository>().todayRouters,
         weekDay: Get.find<RoutersRepository>().getCurrentDay(),
-        selectedMarketCenter: MarketCenter.init(),
+        selectedMarketCenter:
+            Get.find<RoutersRepository>().todayRouters.isNotEmpty
+                ? Get.find<RoutersRepository>().todayRouters.first
+                : MarketCenter.init(),
       );
 
   @override

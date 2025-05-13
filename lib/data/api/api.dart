@@ -13,6 +13,7 @@ class Api {
   /// выгрузка сессии
   Future<String> uploadHystorySessionsToFtp(
       Map<String, dynamic> data, String fileName) async {
+    return '';
     final jsonData = jsonEncode(data);
     logger.Logger.i('data == $jsonData');
     logger.Logger.i('fileName == $fileName');

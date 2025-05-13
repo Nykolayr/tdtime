@@ -13,7 +13,6 @@ import 'package:tdtime/domain/models/week_routers.dart';
 import 'package:tdtime/presentation/screens/main/bloc/main_bloc.dart';
 import 'package:tdtime/presentation/screens/main/get_position.dart';
 import 'package:tdtime/presentation/screens/main/widget.dart';
-import 'package:tdtime/presentation/screens/scan/qr_code_scan.dart';
 import 'package:tdtime/presentation/theme/theme.dart';
 import 'package:tdtime/presentation/widgets/app_bar.dart';
 import 'package:tdtime/presentation/widgets/buttons.dart';
@@ -83,7 +82,7 @@ class MainScanPageState extends State<MainScanPage> {
 
     bloc.add(BeginSessinonEvent(
         id: bloc.state.selectedMarketCenter.id, position: position));
-    await Future.delayed(const Duration(milliseconds: 100));
+    await Future.delayed(const Duration(milliseconds: 300));
     if (bloc.state.error.isEmpty && error.isEmpty) {
       if (mounted) {
         context.go('/main/matrix');
@@ -130,61 +129,70 @@ class MainScanPageState extends State<MainScanPage> {
                           ),
                         ),
                 ),
-                if (state.dayHystorySession.listSessions.isEmpty)
-                  Positioned(
-                    bottom: 150,
-                    left: 20,
-                    right: 20,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        if (state.todayRouters.isEmpty)
-                          UniversalDropdown<WeekDay>(
-                            items: WeekDay.values,
-                            value: selectedDay,
-                            onChanged: (day) {
-                              if (day != null) {
-                                setState(() => selectedDay = day);
-                              }
-                            },
-                            label: 'Выберите день недели',
-                            itemToString: (day) => day.title,
-                          ),
-                        if (state.todayRouters.isNotEmpty)
-                          UniversalDropdown<MarketCenter>(
-                            items: state.todayRouters,
-                            value: state.selectedMarketCenter,
-                            onChanged: (mc) {
-                              if (mc != null) {
-                                bloc.add(
-                                    SelectMarketCenterEvent(marketCenter: mc));
-                              }
-                            },
-                            label: 'Выберите торговую точку',
-                            itemToString: (mc) => mc.name,
-                          ),
-                      ],
-                    ),
-                  ),
                 Positioned(
-                  bottom: 10,
+                  bottom: 170,
+                  left: 20,
+                  right: 20,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (state.todayRouters.isEmpty &&
+                          state.dayHystorySession.listSessions.isEmpty)
+                        UniversalDropdown<WeekDay>(
+                          items: WeekDay.values,
+                          value: selectedDay,
+                          onChanged: (day) {
+                            if (day != null) {
+                              setState(() => selectedDay = day);
+                            }
+                          },
+                          label: 'Выберите день недели',
+                          itemToString: (day) => day.title,
+                        ),
+                      if (state.todayRouters.isNotEmpty &&
+                          state.selectedMarketCenter.name.isNotEmpty)
+                        UniversalDropdown<MarketCenter>(
+                          items: state.todayRouters,
+                          value: state.selectedMarketCenter,
+                          onChanged: (mc) {
+                            if (mc != null) {
+                              bloc.add(
+                                  SelectMarketCenterEvent(marketCenter: mc));
+                            }
+                          },
+                          label: 'Выберите торговую точку',
+                          itemToString: (mc) => mc.name,
+                        ),
+                    ],
+                  ),
+                ),
+                Positioned(
+                  bottom: 0,
                   left: 20,
                   child: Column(
                     children: [
-                      ButtonWide(
-                        text: 'Дальше',
-                        iconPath: 'assets/svg/reader.svg',
-                        onPressed: () {
-                          if (state.todayRouters.isEmpty) {
-                            bloc.add(SelectDayEvent(day: selectedDay));
-                          } else {
-                            startSession();
-                          }
-                        },
-                      ),
+                      if (state.todayRouters.isEmpty)
+                        Text(
+                          'На сегодняшний день, маршрут выполнен',
+                          style: AppText.medium14.copyWith(
+                            color: AppColor.white,
+                          ),
+                        ),
+                      if (state.todayRouters.isNotEmpty)
+                        ButtonWide(
+                          text: 'Дальше',
+                          iconPath: 'assets/svg/reader.svg',
+                          onPressed: () {
+                            if (state.todayRouters.isEmpty) {
+                              bloc.add(SelectDayEvent(day: selectedDay));
+                            } else {
+                              startSession();
+                            }
+                          },
+                        ),
                       const Gap(5),
                       if (state.dayHystorySession.listSessions.isNotEmpty) ...[
-                        const Gap(30),
+                        const Gap(10),
                         ButtonWide(
                           text: 'Закрыть рабочий день',
                           iconPath: 'assets/svg/reader.svg',
@@ -193,7 +201,7 @@ class MainScanPageState extends State<MainScanPage> {
                       ],
                       SizedBox(
                         width: MediaQuery.of(context).size.width - 40,
-                        height: 50,
+                        height: 40,
                         child: (state.error.isNotEmpty || error.isNotEmpty)
                             ? Column(
                                 children: [

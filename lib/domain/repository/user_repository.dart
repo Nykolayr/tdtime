@@ -160,7 +160,7 @@ class UserRepository {
     /// после авторизации загружаем данные из RoutersRepository
     await Get.find<RoutersRepository>().init();
     Get.find<MainBloc>().add(LoadRoutersEvent());
-    saveUserToLocal();
+    await saveUserToLocal();
   }
 
   Future<bool> userEdit() async {
