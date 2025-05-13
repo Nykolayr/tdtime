@@ -9,7 +9,6 @@ import 'package:tdtime/domain/models/session.dart';
 import 'package:tdtime/domain/models/week_routers.dart';
 import 'package:tdtime/domain/repository/routers_repository.dart';
 import 'package:tdtime/domain/repository/user_repository.dart';
-import 'package:tdtime/presentation/screens/main/get_position.dart';
 
 part 'main_event.dart';
 part 'main_state.dart';
@@ -28,6 +27,44 @@ class MainBloc extends Bloc<MainEvent, MainState> {
     on<UpdateWeekRoutersEvent>(_onUpdateWeekRoutersEvent);
     on<SelectDayEvent>(_onSelectDayEvent);
     on<SelectMarketCenterEvent>(_onSelectMarketCenterEvent);
+    on<ShowErrorEvent>(_onShowErrorEvent);
+    on<LoadMarketCentersEvent>(_onLoadMarketCentersEvent);
+    on<ResetErrorEvent>(_onResetErrorEvent);
+  }
+
+  /// сброс ошибки
+  Future<void> _onResetErrorEvent(
+      ResetErrorEvent event, Emitter<MainState> emit) async {
+    emit(state.copyWith(errorShowMessage: ''));
+  }
+
+  /// загрузка списка ТЦ
+  Future<void> _onLoadMarketCentersEvent(
+      LoadMarketCentersEvent event, Emitter<MainState> emit) async {
+    RoutersRepository repo = Get.find<RoutersRepository>();
+    emit(state.copyWith(isLoading: true));
+    String answer = await repo.loadFromFtpTT('all_tt.json');
+    emit(state.copyWith(
+      isLoading: false,
+      isFileExist: repo.isFileExist,
+      filePath: repo.filePath,
+      marketCenters: repo.marketCenters,
+      todayRouters: repo.todayRouters,
+      selectedMarketCenter: repo.todayRouters.isNotEmpty
+          ? repo.todayRouters.first
+          : MarketCenter.init(),
+    ));
+    if (answer.isNotEmpty) {
+      emit(state.copyWith(error: answer));
+      await Future.delayed(const Duration(seconds: 5));
+      emit(state.copyWith(error: ''));
+    }
+  }
+
+  /// показ ошибки
+  Future<void> _onShowErrorEvent(
+      ShowErrorEvent event, Emitter<MainState> emit) async {
+    emit(state.copyWith(errorShowMessage: event.error));
   }
 
   /// выбор торговой точки в списке торговых точек

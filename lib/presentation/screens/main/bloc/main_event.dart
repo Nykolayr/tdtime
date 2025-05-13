@@ -7,6 +7,18 @@ sealed class MainEvent extends Equatable {
   List<Object> get props => [];
 }
 
+/// сброс ошибки
+class ResetErrorEvent extends MainEvent {}
+
+/// загрузка списка ТЦ
+class LoadMarketCentersEvent extends MainEvent {}
+
+/// показ ошибки
+class ShowErrorEvent extends MainEvent {
+  final String error;
+  const ShowErrorEvent({required this.error});
+}
+
 /// выбор торговой точки
 class SelectMarketCenterEvent extends MainEvent {
   final MarketCenter marketCenter;

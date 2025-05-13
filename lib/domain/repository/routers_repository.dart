@@ -9,6 +9,7 @@ import 'package:tdtime/domain/models/week_routers.dart';
 import 'package:tdtime/domain/repository/user_repository.dart';
 import 'package:flutter_easylogger/flutter_logger.dart';
 import 'package:tdtime/data/local_data.dart';
+import 'package:tdtime/presentation/screens/main/bloc/main_bloc.dart';
 
 class RoutersRepository {
   static final RoutersRepository _instance = RoutersRepository._internal();
@@ -23,6 +24,12 @@ class RoutersRepository {
 
   // Хранилище точек на сегодня
   List<MarketCenter> todayRouters = [];
+
+  // Путь к файлу с маршрутами
+  String filePath = '';
+
+  // Флаг, указывающий на наличие файла с маршрутами
+  bool isFileExist = false;
 
   // Инициализация данных
   Future<void> init() async {
@@ -112,26 +119,36 @@ class RoutersRepository {
     try {
       // Загружаем список ТЦ
       final ttData = await Api().downloadJsonFile('all_tt.json');
-      marketCenters = (ttData['marketCenters'] as List)
-          .map((mc) => MarketCenter.fromJson(mc))
-          .toList();
-
-      // Загружаем маршруты
-      final routersData =
-          await Api().downloadJsonFile('${user.id}_routers.json');
-      weekRouters = (routersData['routers'] as List).map((r) {
-        final ids =
-            (r['marketCenterIds'] as List).map((id) => id.toString()).toList();
-        final centers = ids
-            .map((id) => marketCenters.firstWhere((mc) => mc.id == id,
-                orElse: () => MarketCenter.init()))
+      if (ttData['error'] == null) {
+        marketCenters = (ttData['marketCenters'] as List)
+            .map((mc) => MarketCenter.fromJson(mc))
             .toList();
-        return WeekRouters(
-          day: WeekDay.values.firstWhere((e) => e.name == r['day']),
-          marketCenterIds: ids,
-          marketCenters: centers,
-        );
-      }).toList();
+      } else {
+        Get.find<MainBloc>().add(ShowErrorEvent(error: ttData['error']));
+      }
+      filePath = '${user.id}_routers';
+      // Загружаем маршруты
+      final routersData = await Api().downloadJsonFile('$filePath.json');
+      if (routersData['error'] == null) {
+        weekRouters = (routersData['routers'] as List).map((r) {
+          final ids = (r['marketCenterIds'] as List)
+              .map((id) => id.toString())
+              .toList();
+          final centers = ids
+              .map((id) => marketCenters.firstWhere((mc) => mc.id == id,
+                  orElse: () => MarketCenter.init()))
+              .toList();
+          return WeekRouters(
+            day: WeekDay.values.firstWhere((e) => e.name == r['day']),
+            marketCenterIds: ids,
+            marketCenters: centers,
+          );
+        }).toList();
+        isFileExist = true;
+      } else {
+        isFileExist = false;
+        Get.find<MainBloc>().add(ShowErrorEvent(error: routersData['error']));
+      }
 
       // Если данные успешно загружены, сохраняем их локально
       if (marketCenters.isNotEmpty && weekRouters.isNotEmpty) {
@@ -142,6 +159,20 @@ class RoutersRepository {
     } catch (e) {
       Logger.e('Failed to load from FTP: $e');
       rethrow;
+    }
+  }
+
+  Future<String> loadFromFtpTT(String fileName) async {
+    final ttData = await Api().downloadJsonFile(fileName);
+    if (ttData['error'] == null) {
+      marketCenters = (ttData['marketCenters'] as List)
+          .map((mc) => MarketCenter.fromJson(mc))
+          .toList();
+      isFileExist = true;
+      return '';
+    } else {
+      isFileExist = false;
+      return ttData['error'];
     }
   }
 

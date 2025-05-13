@@ -9,6 +9,9 @@ class MainState extends Equatable {
   final List<MarketCenter> todayRouters;
   final WeekDay weekDay;
   final MarketCenter selectedMarketCenter;
+  final String filePath;
+  final bool isFileExist;
+  final String errorShowMessage;
 
   const MainState({
     required this.isLoading,
@@ -19,6 +22,9 @@ class MainState extends Equatable {
     required this.todayRouters,
     required this.weekDay,
     required this.selectedMarketCenter,
+    required this.filePath,
+    required this.isFileExist,
+    required this.errorShowMessage,
   });
 
   MainState copyWith({
@@ -30,6 +36,9 @@ class MainState extends Equatable {
     List<MarketCenter>? todayRouters,
     WeekDay? weekDay,
     MarketCenter? selectedMarketCenter,
+    String? filePath,
+    bool? isFileExist,
+    String? errorShowMessage,
   }) {
     return MainState(
       isLoading: isLoading ?? this.isLoading,
@@ -40,6 +49,9 @@ class MainState extends Equatable {
       todayRouters: todayRouters ?? this.todayRouters,
       weekDay: weekDay ?? this.weekDay,
       selectedMarketCenter: selectedMarketCenter ?? this.selectedMarketCenter,
+      filePath: filePath ?? this.filePath,
+      isFileExist: isFileExist ?? this.isFileExist,
+      errorShowMessage: errorShowMessage ?? this.errorShowMessage,
     );
   }
 
@@ -65,6 +77,9 @@ class MainState extends Equatable {
             Get.find<RoutersRepository>().todayRouters.isNotEmpty
                 ? Get.find<RoutersRepository>().todayRouters.first
                 : MarketCenter.init(),
+        filePath: '',
+        isFileExist: false,
+        errorShowMessage: '',
       );
 
   @override
@@ -75,5 +90,6 @@ class MainState extends Equatable {
         dayHystorySession,
         marketCenters,
         todayRouters,
+        errorShowMessage,
       ];
 }

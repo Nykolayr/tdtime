@@ -15,11 +15,7 @@ class MainPage extends StatefulWidget {
 
 class MainPageState extends State<MainPage> {
   int selectedIndex = 0;
-  List<Widget> pages = const [
-    MainScanPage(),
-    SettingsPage(),
-  ];
-
+  late final List<Widget> pages;
   final PageController pageController =
       PageController(); // Контроллер для PageView
 

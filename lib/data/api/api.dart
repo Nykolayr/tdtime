@@ -114,7 +114,7 @@ class Api {
       return jsonDecode(jsonString);
     } catch (e) {
       logger.Logger.e('Ошибка при скачивании JSON файла: $e');
-      rethrow;
+      return {'error': 'Ошибка при скачивании JSON файла $fileName: $e'};
     }
   }
 }

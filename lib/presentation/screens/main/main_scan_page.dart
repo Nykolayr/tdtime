@@ -10,16 +10,20 @@ import 'package:tdtime/domain/models/hystory_sessions.dart';
 import 'package:tdtime/domain/models/market_center.dart';
 import 'package:tdtime/domain/models/session.dart';
 import 'package:tdtime/domain/models/week_routers.dart';
+import 'package:tdtime/domain/repository/routers_repository.dart';
 import 'package:tdtime/presentation/screens/main/bloc/main_bloc.dart';
 import 'package:tdtime/presentation/screens/main/get_position.dart';
 import 'package:tdtime/presentation/screens/main/widget.dart';
 import 'package:tdtime/presentation/theme/theme.dart';
+import 'package:tdtime/presentation/widgets/alerts.dart';
 import 'package:tdtime/presentation/widgets/app_bar.dart';
 import 'package:tdtime/presentation/widgets/buttons.dart';
 import 'package:tdtime/presentation/widgets/universal_dropdown.dart';
 
 class MainScanPage extends StatefulWidget {
-  const MainScanPage({Key? key}) : super(key: key);
+  final void Function(int) onTabChange;
+  const MainScanPage({Key? key, required this.onTabChange}) : super(key: key);
+
   @override
   State<MainScanPage> createState() => MainScanPageState();
 }
@@ -36,6 +40,39 @@ class MainScanPageState extends State<MainScanPage> {
   @override
   void initState() {
     super.initState();
+    if (bloc.state.errorShowMessage.isNotEmpty) {
+      if (bloc.state.errorShowMessage.contains('all_tt')) {
+        showModalContent(
+          context,
+          'Внимание!',
+          const Text(
+              'У вас нет доступа к списку торговых точек, попробовать еще раз  загрузить?'),
+          () {
+            bloc.add(ResetErrorEvent());
+            Get.find<RoutersRepository>().init();
+            Navigator.of(context).pop();
+          },
+          () {
+            Navigator.of(context).pop();
+          },
+        );
+      } else {
+        showModalContent(
+          context,
+          'Внимание!',
+          Text(
+              'Такого файла ${Get.find<RoutersRepository>().filePath} не существует, поменять файл в настройках?'),
+          () {
+            Navigator.of(context).pop();
+            widget.onTabChange(1);
+          },
+          () {
+            Navigator.of(context).pop();
+            widget.onTabChange(1);
+          },
+        );
+      }
+    }
   }
 
   @override
