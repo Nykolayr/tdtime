@@ -93,3 +93,24 @@ class DeleteMatrixEvent extends MainEvent {
 
 /// отмена сканирования
 class UndoMatrixEvent extends MainEvent {}
+
+/// принудительная отправка всех сессий
+class ForceUploadAllSessionsEvent extends MainEvent {}
+
+/// загрузка неотправленных сессий
+class LoadUnsentSessionsEvent extends MainEvent {}
+
+/// отправка сессий для конкретного дня
+class UploadSessionsForDayEvent extends MainEvent {
+  final String dayKey;
+  const UploadSessionsForDayEvent({required this.dayKey});
+}
+
+/// восстановление незавершенного дня
+class RestoreUnfinishedDayEvent extends MainEvent {}
+
+/// получение прогресса дня
+class GetDayProgressEvent extends MainEvent {}
+
+/// начало нового дня
+class StartNewDayEvent extends MainEvent {}

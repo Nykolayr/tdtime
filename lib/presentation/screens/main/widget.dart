@@ -3,6 +3,7 @@ import 'package:flutter_svg/svg.dart';
 import 'package:gap/gap.dart';
 import 'package:get/get.dart';
 import 'package:tdtime/domain/models/session.dart';
+import 'package:tdtime/domain/models/hystory_sessions.dart';
 import 'package:tdtime/presentation/screens/main/edti_TT.dart';
 import 'package:tdtime/presentation/theme/theme.dart';
 import 'package:tdtime/presentation/widgets/alerts.dart';
@@ -56,6 +57,72 @@ class ButtonTab extends StatelessWidget {
   }
 }
 
+/// Виджет статистики отправки сессий
+class UploadStatusWidget extends StatelessWidget {
+  final List<SessionScan> sessions;
+
+  const UploadStatusWidget({
+    Key? key,
+    required this.sessions,
+  }) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    if (sessions.isEmpty) return const SizedBox.shrink();
+
+    int totalClosed =
+        sessions.where((s) => s.state == StateSession.close).length;
+    int uploaded = sessions
+        .where((s) => s.state == StateSession.close && s.isUploaded)
+        .length;
+    int pending = totalClosed - uploaded;
+
+    if (totalClosed == 0) return const SizedBox.shrink();
+
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColor.blueFon2,
+        borderRadius: AppDif.borderRadius10,
+        border: Border.all(color: AppColor.white.withOpacity(0.3)),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            Icons.cloud_upload,
+            color: AppColor.white,
+            size: 16,
+          ),
+          const Gap(8),
+          Text(
+            'Сессий: $totalClosed',
+            style: AppText.text12.copyWith(color: AppColor.white),
+          ),
+          const Gap(16),
+          if (uploaded > 0) ...[
+            Icon(Icons.check_circle, color: AppColor.green, size: 16),
+            const Gap(4),
+            Text(
+              '$uploaded отправлено',
+              style: AppText.text12.copyWith(color: AppColor.green),
+            ),
+            const Gap(16),
+          ],
+          if (pending > 0) ...[
+            Icon(Icons.schedule, color: AppColor.yellow, size: 16),
+            const Gap(4),
+            Text(
+              '$pending ожидает',
+              style: AppText.text12.copyWith(color: AppColor.yellow),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
 /// пустая страница, когда нет еще ни одной сессии
 class EmptySession extends StatelessWidget {
   const EmptySession({
@@ -93,24 +160,57 @@ class ItemSession extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Определяем статус отправки
+    bool isUploaded = item?.isUploaded ?? false;
+    bool isClosed = item?.state == StateSession.close;
+
     return Container(
       width: MediaQuery.of(context).size.width - 50,
-      height: 50,
+      height: isClosed ? 65 : 50,
       padding: const EdgeInsets.symmetric(vertical: 5, horizontal: 15),
-      margin: const EdgeInsets.symmetric(vertical: 10),
-      decoration: const BoxDecoration(
-        color: AppColor.blueFon2,
+      margin: const EdgeInsets.symmetric(vertical: 5),
+      decoration: BoxDecoration(
+        color: isClosed
+            ? (isUploaded
+                ? AppColor.green.withOpacity(0.3)
+                : AppColor.yellow.withOpacity(0.3))
+            : AppColor.blueFon2,
         borderRadius: AppDif.borderRadius10,
+        border: isClosed
+            ? Border.all(
+                color: isUploaded ? AppColor.green : AppColor.yellow, width: 2)
+            : null,
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.start,
         children: [
-          SvgPicture.asset('assets/svg/reader.svg', width: 18),
+          // Иконка статуса
+          if (isClosed)
+            Icon(
+              isUploaded ? Icons.cloud_done : Icons.cloud_upload,
+              color: isUploaded ? AppColor.green : AppColor.yellow,
+              size: 18,
+            )
+          else
+            SvgPicture.asset('assets/svg/reader.svg', width: 18),
           const Gap(7),
           Expanded(
-            child: Text((item != null) ? 'Торговая точка №${item!.id}' : title,
-                overflow: TextOverflow.ellipsis,
-                style: AppText.text14b.copyWith(color: AppColor.white)),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text((item != null) ? 'Торговая точка №${item!.id}' : title,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppText.text14b.copyWith(color: AppColor.white)),
+                if (isClosed)
+                  Text(
+                    isUploaded ? 'Отправлено на сервер' : 'Ожидает отправки',
+                    style: AppText.text10.copyWith(
+                      color: isUploaded ? AppColor.green : AppColor.yellow,
+                    ),
+                  ),
+              ],
+            ),
           ),
           GestureDetector(
             onTap: () {

@@ -12,6 +12,10 @@ class MainState extends Equatable {
   final String filePath;
   final bool isFileExist;
   final String errorShowMessage;
+  final Map<String, List<SessionScan>> unsentSessions;
+  final bool hasUnsentSessions;
+  final Map<String, dynamic> dayProgress;
+  final bool shouldShowDaySelection;
 
   const MainState({
     required this.isLoading,
@@ -25,6 +29,10 @@ class MainState extends Equatable {
     required this.filePath,
     required this.isFileExist,
     required this.errorShowMessage,
+    required this.unsentSessions,
+    required this.hasUnsentSessions,
+    required this.dayProgress,
+    required this.shouldShowDaySelection,
   });
 
   MainState copyWith({
@@ -39,6 +47,10 @@ class MainState extends Equatable {
     String? filePath,
     bool? isFileExist,
     String? errorShowMessage,
+    Map<String, List<SessionScan>>? unsentSessions,
+    bool? hasUnsentSessions,
+    Map<String, dynamic>? dayProgress,
+    bool? shouldShowDaySelection,
   }) {
     return MainState(
       isLoading: isLoading ?? this.isLoading,
@@ -52,6 +64,11 @@ class MainState extends Equatable {
       filePath: filePath ?? this.filePath,
       isFileExist: isFileExist ?? this.isFileExist,
       errorShowMessage: errorShowMessage ?? this.errorShowMessage,
+      unsentSessions: unsentSessions ?? this.unsentSessions,
+      hasUnsentSessions: hasUnsentSessions ?? this.hasUnsentSessions,
+      dayProgress: dayProgress ?? this.dayProgress,
+      shouldShowDaySelection:
+          shouldShowDaySelection ?? this.shouldShowDaySelection,
     );
   }
 
@@ -80,6 +97,10 @@ class MainState extends Equatable {
         filePath: Get.find<UserRepository>().user.filePath,
         isFileExist: false,
         errorShowMessage: Get.find<RoutersRepository>().errorMessage,
+        unsentSessions: {},
+        hasUnsentSessions: false,
+        dayProgress: {},
+        shouldShowDaySelection: false,
       );
 
   @override
@@ -93,5 +114,9 @@ class MainState extends Equatable {
         errorShowMessage,
         filePath,
         isFileExist,
+        unsentSessions,
+        hasUnsentSessions,
+        dayProgress,
+        shouldShowDaySelection,
       ];
 }

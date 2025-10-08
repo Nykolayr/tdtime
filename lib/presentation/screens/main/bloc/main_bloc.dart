@@ -31,6 +31,12 @@ class MainBloc extends Bloc<MainEvent, MainState> {
     on<LoadMarketCentersEvent>(_onLoadMarketCentersEvent);
     on<ResetErrorEvent>(_onResetErrorEvent);
     on<NewFileEvent>(_onNewFileEvent);
+    on<ForceUploadAllSessionsEvent>(_onForceUploadAllSessionsEvent);
+    on<LoadUnsentSessionsEvent>(_onLoadUnsentSessionsEvent);
+    on<UploadSessionsForDayEvent>(_onUploadSessionsForDayEvent);
+    on<RestoreUnfinishedDayEvent>(_onRestoreUnfinishedDayEvent);
+    on<GetDayProgressEvent>(_onGetDayProgressEvent);
+    on<StartNewDayEvent>(_onStartNewDayEvent);
   }
 
   /// новый файл
@@ -214,11 +220,21 @@ class MainBloc extends Bloc<MainEvent, MainState> {
         marketCenter = repoRouters.todayRouters.first;
       }
 
+      // Обновляем прогресс дня после начала сессии
+      Map<String, dynamic> progress = repoRouters.getDayProgress();
+
+      // Обновляем состояние неотправленных сессий
+      Map<String, dynamic> unsentSessions = repoUser.getAllUnsentSessions();
+
       emit(state.copyWith(
         dayHystorySession: repoUser.lastDay,
         curSession: repoUser.lastDay.listSessions.last,
         todayRouters: repoRouters.todayRouters,
         selectedMarketCenter: marketCenter,
+        dayProgress: progress,
+        unsentSessions:
+            unsentSessions['unsentByDay'] as Map<String, List<SessionScan>>,
+        hasUnsentSessions: unsentSessions['hasUnsent'] as bool,
       ));
     }
   }
@@ -243,17 +259,34 @@ class MainBloc extends Bloc<MainEvent, MainState> {
   Future<void> _onClosedayEvent(
       ClosedayEvent event, Emitter<MainState> emit) async {
     UserRepository repo = Get.find<UserRepository>();
+    RoutersRepository routersRepo = Get.find<RoutersRepository>();
+
     emit(state.copyWith(isLoading: true));
     String answer = await repo.closeDay();
     emit(state.copyWith(isLoading: false));
+
     if (answer.isNotEmpty) {
       emit(state.copyWith(error: answer));
       await Future.delayed(const Duration(seconds: 5));
       emit(state.copyWith(error: ''));
     } else {
+      // Обновляем состояние после закрытия дня
+      Map<String, dynamic> unsentSessions = repo.getAllUnsentSessions();
+      Map<String, dynamic> progress = routersRepo.getDayProgress();
+
+      // Проверяем, нужно ли переходить к выбору дня
+      bool shouldShowDaySelection = routersRepo.todayRouters.isEmpty &&
+          !unsentSessions['hasUnsent'] as bool;
+
       emit(state.copyWith(
         dayHystorySession: repo.lastDay,
         curSession: SessionScan.init(),
+        todayRouters: routersRepo.todayRouters,
+        dayProgress: progress,
+        unsentSessions:
+            unsentSessions['unsentByDay'] as Map<String, List<SessionScan>>,
+        hasUnsentSessions: unsentSessions['hasUnsent'] as bool,
+        shouldShowDaySelection: shouldShowDaySelection,
       ));
     }
   }
@@ -271,10 +304,146 @@ class MainBloc extends Bloc<MainEvent, MainState> {
       await Future.delayed(const Duration(seconds: 5));
       emit(state.copyWith(error: ''));
     } else {
+      // Обновляем прогресс дня после закрытия сессии
+      RoutersRepository routersRepo = Get.find<RoutersRepository>();
+
+      // Удаляем обработанную торговую точку из списка
+      if (state.selectedMarketCenter.id.isNotEmpty) {
+        routersRepo.removeMarketCenter(state.selectedMarketCenter);
+      }
+
+      Map<String, dynamic> progress = routersRepo.getDayProgress();
+
+      // Обновляем состояние неотправленных сессий
+      Map<String, dynamic> unsentSessions = repo.getAllUnsentSessions();
+
       emit(state.copyWith(
         dayHystorySession: repo.lastDay,
         curSession: repo.lastDay.listSessions.last,
+        todayRouters: routersRepo.todayRouters,
+        dayProgress: progress,
+        unsentSessions:
+            unsentSessions['unsentByDay'] as Map<String, List<SessionScan>>,
+        hasUnsentSessions: unsentSessions['hasUnsent'] as bool,
       ));
     }
+  }
+
+  /// принудительная отправка всех сессий
+  Future<void> _onForceUploadAllSessionsEvent(
+      ForceUploadAllSessionsEvent event, Emitter<MainState> emit) async {
+    emit(state.copyWith(isLoading: true));
+    UserRepository repo = Get.find<UserRepository>();
+
+    String answer = await repo.forceUploadAllSessions();
+    emit(state.copyWith(isLoading: false));
+
+    if (answer.isNotEmpty) {
+      emit(state.copyWith(error: answer));
+      await Future.delayed(const Duration(seconds: 5));
+      emit(state.copyWith(error: ''));
+    } else {
+      // После успешной отправки обновляем состояние
+      Map<String, dynamic> unsentSessions = repo.getAllUnsentSessions();
+      RoutersRepository routersRepo = Get.find<RoutersRepository>();
+      Map<String, dynamic> progress = routersRepo.getDayProgress();
+
+      emit(state.copyWith(
+        dayHystorySession: repo.lastDay,
+        curSession: repo.lastDay.listSessions.isNotEmpty
+            ? repo.lastDay.listSessions.last
+            : SessionScan.init(),
+        unsentSessions:
+            unsentSessions['unsentByDay'] as Map<String, List<SessionScan>>,
+        hasUnsentSessions: unsentSessions['hasUnsent'] as bool,
+        dayProgress: progress,
+      ));
+    }
+  }
+
+  /// загрузка неотправленных сессий
+  Future<void> _onLoadUnsentSessionsEvent(
+      LoadUnsentSessionsEvent event, Emitter<MainState> emit) async {
+    UserRepository repo = Get.find<UserRepository>();
+    Map<String, dynamic> unsentData = repo.getAllUnsentSessions();
+
+    emit(state.copyWith(
+      unsentSessions:
+          unsentData['unsentByDay'] as Map<String, List<SessionScan>>,
+      hasUnsentSessions: unsentData['hasUnsent'] as bool,
+    ));
+  }
+
+  /// отправка сессий для конкретного дня
+  Future<void> _onUploadSessionsForDayEvent(
+      UploadSessionsForDayEvent event, Emitter<MainState> emit) async {
+    emit(state.copyWith(isLoading: true));
+    UserRepository repo = Get.find<UserRepository>();
+
+    String answer = await repo.uploadSessionsForDay(event.dayKey);
+    emit(state.copyWith(isLoading: false));
+
+    if (answer.isNotEmpty) {
+      emit(state.copyWith(error: answer));
+      await Future.delayed(const Duration(seconds: 5));
+      emit(state.copyWith(error: ''));
+    } else {
+      // Обновляем список неотправленных сессий
+      Map<String, dynamic> unsentData = repo.getAllUnsentSessions();
+      emit(state.copyWith(
+        unsentSessions:
+            unsentData['unsentByDay'] as Map<String, List<SessionScan>>,
+        hasUnsentSessions: unsentData['hasUnsent'] as bool,
+      ));
+    }
+  }
+
+  /// восстановление незавершенного дня
+  Future<void> _onRestoreUnfinishedDayEvent(
+      RestoreUnfinishedDayEvent event, Emitter<MainState> emit) async {
+    RoutersRepository repo = Get.find<RoutersRepository>();
+    await repo.restoreUnfinishedDay();
+
+    emit(state.copyWith(
+      todayRouters: repo.todayRouters,
+      selectedMarketCenter: repo.todayRouters.isNotEmpty
+          ? repo.todayRouters.first
+          : MarketCenter.init(),
+    ));
+  }
+
+  /// получение прогресса дня
+  Future<void> _onGetDayProgressEvent(
+      GetDayProgressEvent event, Emitter<MainState> emit) async {
+    RoutersRepository repo = Get.find<RoutersRepository>();
+    Map<String, dynamic> progress = repo.getDayProgress();
+
+    emit(state.copyWith(
+      dayProgress: progress,
+    ));
+  }
+
+  /// начало нового дня
+  Future<void> _onStartNewDayEvent(
+      StartNewDayEvent event, Emitter<MainState> emit) async {
+    UserRepository userRepo = Get.find<UserRepository>();
+    RoutersRepository routersRepo = Get.find<RoutersRepository>();
+
+    // Закрываем текущий день
+    await userRepo.closeDay();
+
+    // Начинаем новый день
+    routersRepo.todayRouters =
+        routersRepo.getMarketCentersForDay(day: routersRepo.getCurrentDay());
+    await routersRepo.saveTodayRouters();
+
+    emit(state.copyWith(
+      dayHystorySession: userRepo.lastDay,
+      curSession: SessionScan.init(),
+      todayRouters: routersRepo.todayRouters,
+      selectedMarketCenter: routersRepo.todayRouters.isNotEmpty
+          ? routersRepo.todayRouters.first
+          : MarketCenter.init(),
+    ));
   }
 }

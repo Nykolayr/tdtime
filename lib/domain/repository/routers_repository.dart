@@ -2,6 +2,8 @@ import 'package:get/get.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:tdtime/data/api/api.dart';
 import 'package:tdtime/domain/models/market_center.dart';
+import 'package:tdtime/domain/models/session.dart';
+import 'package:tdtime/domain/models/hystory_sessions.dart';
 import 'package:tdtime/domain/models/week_routers.dart';
 import 'package:tdtime/domain/repository/user_repository.dart';
 import 'package:flutter_easylogger/flutter_logger.dart';
@@ -33,15 +35,14 @@ class RoutersRepository {
     if (user.id.isEmpty) {
       return;
     }
+    // Сначала пытаемся загрузить из локального хранилища
     try {
-      await _loadFromFtp();
+      await _loadFromLocal();
+      Logger.i('Данные загружены из локального хранилища');
     } catch (e) {
-      Logger.e('Failed to load from ftp: $e');
-      try {
-        await _loadFromLocal();
-      } catch (e) {
-        Logger.e('Failed to load from local: $e');
-      }
+      Logger.e('Failed to load from local: $e');
+      // Если локальных данных нет, показываем ошибку
+      errorMessage = 'Нет доступа к интернету. Невозможно загрузить данные.';
     }
 
     final today = getCurrentDay();
@@ -64,6 +65,9 @@ class RoutersRepository {
       }
       Logger.i('Тот же день: todayRouters из локалки');
     }
+
+    // Восстанавливаем незавершенный день, если есть
+    await restoreUnfinishedDay();
   }
 
   /// убираем выбранный ТЦ из списка точек на сегодня
@@ -76,6 +80,61 @@ class RoutersRepository {
   Future<void> selectDay(WeekDay day) async {
     todayRouters = getMarketCentersForDay(day: day);
     await _saveTodayRouters();
+  }
+
+  /// Восстановление маршрута для незавершенного дня
+  Future<void> restoreUnfinishedDay() async {
+    final user = Get.find<UserRepository>();
+
+    // Получаем все закрытые сессии за сегодня
+    List<SessionScan> closedSessions = user.lastDay.listSessions
+        .where((session) => session.state == StateSession.close)
+        .toList();
+
+    if (closedSessions.isNotEmpty) {
+      // Удаляем из todayRouters те торговые точки, которые уже обработаны
+      List<String> processedIds =
+          closedSessions.map((s) => s.id).where((id) => id.isNotEmpty).toList();
+
+      // Восстанавливаем оригинальный список для сегодняшнего дня
+      todayRouters = getMarketCentersForDay(day: getCurrentDay());
+
+      // Удаляем уже обработанные торговые точки
+      todayRouters.removeWhere((mc) => processedIds.contains(mc.id));
+
+      Logger.i(
+          'Восстановлен маршрут: осталось ${todayRouters.length} торговых точек');
+      await _saveTodayRouters();
+    }
+  }
+
+  /// Проверка, завершен ли рабочий день
+  bool isDayCompleted() {
+    return todayRouters.isEmpty;
+  }
+
+  /// Получение прогресса дня
+  Map<String, dynamic> getDayProgress() {
+    final user = Get.find<UserRepository>();
+    List<SessionScan> closedSessions = user.lastDay.listSessions
+        .where((session) => session.state == StateSession.close)
+        .toList();
+
+    // Получаем полный список торговых точек для сегодняшнего дня
+    List<MarketCenter> fullDayRouters =
+        getMarketCentersForDay(day: getCurrentDay());
+
+    int total = fullDayRouters.length;
+    int completed = closedSessions.length;
+    int remaining = todayRouters.length;
+
+    return {
+      'total': total,
+      'completed': completed,
+      'remaining': remaining,
+      'isCompleted': remaining == 0,
+      'progress': total > 0 ? (completed / total) : 0.0,
+    };
   }
 
   // загрузка точек на сегодня
@@ -105,6 +164,11 @@ class RoutersRepository {
       json: todayRouters.map((mc) => mc.toJson()).toList(),
       key: LocalDataKey.todayRouters,
     );
+  }
+
+  // Публичный метод для сохранения точек на сегодня
+  Future<void> saveTodayRouters() async {
+    await _saveTodayRouters();
   }
 
   // Загрузка данных из FTP

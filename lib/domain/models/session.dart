@@ -8,6 +8,7 @@ class SessionScan {
   DateTime time;
   List<String> dataMatrix;
   StateSession state;
+  bool isUploaded; // флаг для отслеживания отправки на сервер
 
   // Конструктор
   SessionScan({
@@ -16,6 +17,7 @@ class SessionScan {
     required this.time,
     required this.dataMatrix,
     required this.state,
+    this.isUploaded = false,
   });
 
   // Метод fromJson
@@ -27,6 +29,7 @@ class SessionScan {
       dataMatrix: List<String>.from(json['DataMatrix']),
       state: StateSession.values.firstWhere((e) => e.name == json['state'],
           orElse: () => StateSession.create),
+      isUploaded: json['isUploaded'] ?? false,
     );
   }
 
@@ -38,6 +41,7 @@ class SessionScan {
       'time': time.toIso8601String(),
       'DataMatrix': dataMatrix,
       'state': state.name,
+      'isUploaded': isUploaded,
     };
   }
 
@@ -59,6 +63,7 @@ class SessionScan {
       time: DateTime.now(),
       dataMatrix: [],
       state: StateSession.create,
+      isUploaded: false,
     );
   }
 

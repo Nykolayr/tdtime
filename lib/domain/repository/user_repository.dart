@@ -44,7 +44,109 @@ class UserRepository {
     if (hystorySessions.isEmpty) {
       hystorySessions.add(HystorySessions.init());
     }
+
+    // Проверяем, есть ли неотправленные сессии в предыдущих днях
+    await _checkForUnsentSessions();
+
     Logger.i('lastDay init ${lastDay.toJson()}');
+  }
+
+  /// Проверка неотправленных сессий при инициализации
+  Future<void> _checkForUnsentSessions() async {
+    bool hasUnsentSessions = false;
+
+    for (var day in hystorySessions) {
+      for (var session in day.listSessions) {
+        if (session.state == StateSession.close && !session.isUploaded) {
+          hasUnsentSessions = true;
+          break;
+        }
+      }
+      if (hasUnsentSessions) break;
+    }
+
+    if (hasUnsentSessions) {
+      Logger.w('Обнаружены неотправленные сессии при инициализации');
+      // Здесь можно добавить логику для показа экрана с неотправленными сессиями
+    }
+  }
+
+  /// Получение всех неотправленных сессий по дням
+  Map<String, dynamic> getAllUnsentSessions() {
+    Map<String, List<SessionScan>> unsentByDay = {};
+    int totalUnsent = 0;
+
+    for (var day in hystorySessions) {
+      List<SessionScan> unsentSessions = day.listSessions
+          .where((session) =>
+              session.state == StateSession.close && !session.isUploaded)
+          .toList();
+
+      if (unsentSessions.isNotEmpty) {
+        String dayKey = day.getFormattedDateTime();
+        unsentByDay[dayKey] = unsentSessions;
+        totalUnsent += unsentSessions.length;
+      }
+    }
+
+    return {
+      'unsentByDay': unsentByDay,
+      'totalUnsent': totalUnsent,
+      'hasUnsent': totalUnsent > 0,
+    };
+  }
+
+  /// Отправка всех неотправленных сессий для конкретного дня
+  Future<String> uploadSessionsForDay(String dayKey) async {
+    Logger.i('Отправка сессий для дня: $dayKey');
+
+    int successCount = 0;
+    int failCount = 0;
+    String lastError = '';
+
+    for (var day in hystorySessions) {
+      String currentDayKey = day.getFormattedDateTime();
+      if (currentDayKey == dayKey) {
+        for (var session in day.listSessions) {
+          if (session.state == StateSession.close && !session.isUploaded) {
+            try {
+              String fileName =
+                  '${session.id}_${session.time.microsecondsSinceEpoch}.json';
+              Map<String, dynamic> data = {};
+              data['FIO'] = '${user.family} ${user.name} ${user.patron}';
+              data['ID'] = user.id;
+              data['TT_INFO'] = session.toMapForFtp();
+
+              String answer =
+                  await Api().uploadHystorySessionsToFtp(data, fileName);
+              if (answer.isEmpty) {
+                session.isUploaded = true;
+                successCount++;
+                Logger.i('Сессия ${session.id} успешно отправлена');
+              } else {
+                failCount++;
+                lastError = answer;
+                Logger.w('Не удалось отправить сессию ${session.id}: $answer');
+              }
+            } catch (e) {
+              failCount++;
+              lastError = e.toString();
+              Logger.e('Ошибка при отправке сессии ${session.id}: $e');
+            }
+          }
+        }
+        break;
+      }
+    }
+
+    // Сохраняем обновленные данные
+    saveHystorySessionsToLocal();
+
+    if (failCount == 0) {
+      return '';
+    } else {
+      return 'Отправлено: $successCount, Ошибок: $failCount. Последняя ошибка: $lastError';
+    }
   }
 
   /// удаление сессии
@@ -89,24 +191,156 @@ class UserRepository {
     data['TT_INFO'] = lastDay.listSessions.last.toMapForFtp();
     Logger.i('data == $data');
     Logger.i('fileName == $fileName');
+
+    // Пытаемся отправить на FTP сервер
     String answer = await Api().uploadHystorySessionsToFtp(data, fileName);
     Logger.i('answer == $answer');
-    if (answer.isNotEmpty) {
-      return answer;
-    }
+
+    // ВАЖНО: Сохраняем данные локально ВСЕГДА, независимо от результата FTP
     lastDay.listSessions.last.state = StateSession.close;
+
+    // Отмечаем сессию как отправленную только если FTP успешен
+    if (answer.isEmpty) {
+      lastDay.listSessions.last.isUploaded = true;
+      Logger.i(
+          'Сессия ${lastDay.listSessions.last.id} успешно отправлена на сервер');
+    } else {
+      lastDay.listSessions.last.isUploaded = false;
+      Logger.w(
+          'FTP загрузка не удалась, но данные сохранены локально: $answer');
+    }
+
     Logger.i('${lastDay.listSessions.last.toJson()}');
     saveHystorySessionsToLocal();
+
+    // Если была ошибка FTP, возвращаем сообщение об ошибке
+    if (answer.isNotEmpty) {
+      return 'Ошибка сохранения на сервер: $answer. Данные сохранены локально и будут отправлены позже.';
+    }
+
     return '';
   }
 
   /// закрытие дня
   Future<String> closeDay() async {
     lastDay.state = StateSession.close;
+
+    // Пытаемся повторно отправить все неотправленные сессии
+    await _retryFailedUploads();
+
     hystorySessions.add(HystorySessions.init());
     saveHystorySessionsToLocal();
     await Future.delayed(const Duration(seconds: 1));
     return '';
+  }
+
+  /// Повторная отправка всех неотправленных сессий
+  Future<void> _retryFailedUploads() async {
+    Logger.i('Попытка повторной отправки неотправленных сессий...');
+
+    for (var day in hystorySessions) {
+      for (var session in day.listSessions) {
+        if (session.state == StateSession.close && !session.isUploaded) {
+          try {
+            String fileName =
+                '${session.id}_${session.time.microsecondsSinceEpoch}.json';
+            Map<String, dynamic> data = {};
+            data['FIO'] = '${user.family} ${user.name} ${user.patron}';
+            data['ID'] = user.id;
+            data['TT_INFO'] = session.toMapForFtp();
+
+            String answer =
+                await Api().uploadHystorySessionsToFtp(data, fileName);
+            if (answer.isEmpty) {
+              session.isUploaded = true;
+              Logger.i('Сессия ${session.id} успешно отправлена повторно');
+            } else {
+              Logger.w(
+                  'Не удалось повторно отправить сессию ${session.id}: $answer');
+            }
+          } catch (e) {
+            Logger.e('Ошибка при повторной отправке сессии ${session.id}: $e');
+          }
+        }
+      }
+    }
+
+    // Сохраняем обновленные данные
+    saveHystorySessionsToLocal();
+  }
+
+  /// Проверка статуса отправки сессий за сегодня
+  Map<String, dynamic> getTodayUploadStatus() {
+    int totalClosed = 0;
+    int uploaded = 0;
+    int pending = 0;
+
+    for (var session in lastDay.listSessions) {
+      if (session.state == StateSession.close) {
+        totalClosed++;
+        if (session.isUploaded) {
+          uploaded++;
+        } else {
+          pending++;
+        }
+      }
+    }
+
+    return {
+      'totalClosed': totalClosed,
+      'uploaded': uploaded,
+      'pending': pending,
+      'allUploaded': totalClosed > 0 && pending == 0,
+    };
+  }
+
+  /// Принудительная отправка всех неотправленных сессий
+  Future<String> forceUploadAllSessions() async {
+    Logger.i('Принудительная отправка всех неотправленных сессий...');
+
+    int successCount = 0;
+    int failCount = 0;
+    String lastError = '';
+
+    for (var day in hystorySessions) {
+      for (var session in day.listSessions) {
+        if (session.state == StateSession.close && !session.isUploaded) {
+          try {
+            String fileName =
+                '${session.id}_${session.time.microsecondsSinceEpoch}.json';
+            Map<String, dynamic> data = {};
+            data['FIO'] = '${user.family} ${user.name} ${user.patron}';
+            data['ID'] = user.id;
+            data['TT_INFO'] = session.toMapForFtp();
+
+            String answer =
+                await Api().uploadHystorySessionsToFtp(data, fileName);
+            if (answer.isEmpty) {
+              session.isUploaded = true;
+              successCount++;
+              Logger.i('Сессия ${session.id} успешно отправлена');
+            } else {
+              failCount++;
+              lastError = answer;
+              Logger.w('Не удалось отправить сессию ${session.id}: $answer');
+            }
+          } catch (e) {
+            failCount++;
+            lastError = e.toString();
+            Logger.e('Ошибка при отправке сессии ${session.id}: $e');
+          }
+        }
+      }
+    }
+
+    // Сохраняем обновленные данные
+    saveHystorySessionsToLocal();
+
+    if (failCount == 0) {
+      return '';
+    } else {
+      return 'Отправлено: $successCount, Ошибок: $failCount. Последняя ошибка: $lastError';
+    }
   }
 
   /// Добавление сессии
