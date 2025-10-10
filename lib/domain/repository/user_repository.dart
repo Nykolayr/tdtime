@@ -388,13 +388,42 @@ class UserRepository {
   }
 
   /// авторизация пользователя
-  authUser({required User userIn}) async {
+  Future<bool> authUser({required User userIn}) async {
     user = userIn;
 
     /// после авторизации загружаем данные из RoutersRepository
-    await Get.find<RoutersRepository>().init();
+    bool dataLoaded = await Get.find<RoutersRepository>().init();
+
+    if (!dataLoaded) {
+      // Данные не загружены - показываем ошибку и не переходим дальше
+      Get.find<MainBloc>().add(ShowErrorEvent(
+        error:
+            'Не удалось загрузить данные. Проверьте подключение к интернету и правильность ID пользователя.',
+      ));
+      return false;
+    }
+
+    // Только после успешной загрузки данных проверяем первый заход
+    Get.find<MainBloc>().add(CheckFirstLoginEvent());
     Get.find<MainBloc>().add(LoadRoutersEvent());
     await saveUserToLocal();
+    return true;
+  }
+
+  /// Проверка первого входа пользователя
+  Future<void> _checkFirstLogin() async {
+    // Проверяем, есть ли сохраненные данные о последнем открытом дне
+    final lastOpened =
+        await Get.find<RoutersRepository>().loadLastOpenedWeekDay();
+
+    if (lastOpened == null) {
+      // Это первый заход - нужно показать выбор дня
+      Logger.i('Первый заход пользователя, нужно показать выбор дня');
+      // Здесь можно добавить флаг или событие для показа экрана выбора дня
+      // Пока что просто логируем
+    } else {
+      Logger.i('Пользователь уже работал ранее, последний день: $lastOpened');
+    }
   }
 
   Future<bool> userEdit() async {

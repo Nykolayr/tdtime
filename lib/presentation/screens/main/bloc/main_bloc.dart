@@ -37,6 +37,7 @@ class MainBloc extends Bloc<MainEvent, MainState> {
     on<RestoreUnfinishedDayEvent>(_onRestoreUnfinishedDayEvent);
     on<GetDayProgressEvent>(_onGetDayProgressEvent);
     on<StartNewDayEvent>(_onStartNewDayEvent);
+    on<CheckFirstLoginEvent>(_onCheckFirstLoginEvent);
   }
 
   /// новый файл
@@ -103,12 +104,20 @@ class MainBloc extends Bloc<MainEvent, MainState> {
       SelectDayEvent event, Emitter<MainState> emit) async {
     emit(state.copyWith(weekDay: event.day, isLoading: true));
     Get.find<RoutersRepository>().selectDay(event.day);
-    Logger.i(
-        'todayRouters: ${Get.find<RoutersRepository>().todayRouters.length}');
+
+    // Сохраняем выбранный день как последний открытый
+    await Get.find<RoutersRepository>().saveLastOpenedWeekDay(event.day);
+
+    final todayRouters = Get.find<RoutersRepository>().todayRouters;
+    Logger.i('todayRouters: ${todayRouters.length}');
+
     emit(state.copyWith(
       isLoading: false,
-      todayRouters: Get.find<RoutersRepository>().todayRouters,
-      selectedMarketCenter: Get.find<RoutersRepository>().todayRouters.first,
+      todayRouters: todayRouters,
+      selectedMarketCenter:
+          todayRouters.isNotEmpty ? todayRouters.first : MarketCenter.init(),
+      shouldShowDaySelection: false, // Скрываем выбор дня
+      isFirstLogin: false, // Больше не первый вход
     ));
   }
 
@@ -445,5 +454,41 @@ class MainBloc extends Bloc<MainEvent, MainState> {
           ? routersRepo.todayRouters.first
           : MarketCenter.init(),
     ));
+  }
+
+  /// проверка первого входа пользователя
+  Future<void> _onCheckFirstLoginEvent(
+      CheckFirstLoginEvent event, Emitter<MainState> emit) async {
+    final routersRepo = Get.find<RoutersRepository>();
+
+    // Проверяем, есть ли сохраненные данные о последнем открытом дне
+    final lastOpened = await routersRepo.loadLastOpenedWeekDay();
+
+    // Проверяем, есть ли загруженные маршруты для дней недели
+    final hasWeekRouters = routersRepo.weekRouters.isNotEmpty;
+
+    if (lastOpened == null && hasWeekRouters) {
+      // Это первый заход И есть данные о днях недели - показываем выбор дня
+      Logger.i('Первый заход с данными о днях недели, показываем выбор дня');
+      emit(state.copyWith(
+        isFirstLogin: true,
+        shouldShowDaySelection: true,
+      ));
+    } else if (!hasWeekRouters) {
+      // Нет данных о днях недели - блокируем работу
+      Logger.e('Нет данных о днях недели, работа невозможна');
+      emit(state.copyWith(
+        isFirstLogin: false,
+        shouldShowDaySelection: false,
+        error: 'Нет данных о маршрутах. Обратитесь к администратору.',
+      ));
+    } else {
+      // Пользователь уже работал ранее
+      Logger.i('Пользователь уже работал ранее, последний день: $lastOpened');
+      emit(state.copyWith(
+        isFirstLogin: false,
+        shouldShowDaySelection: false,
+      ));
+    }
   }
 }

@@ -163,17 +163,17 @@ class AuthPageState extends State<AuthPage> {
                               keyboardType: TextInputType.name,
                               isCapitalization: false,
                             ),
-                            if (error.isNotEmpty)
+                            if (error.isNotEmpty || state.error.isNotEmpty)
                               Container(
                                 height: 45,
                                 width: double.infinity,
                                 alignment: Alignment.topCenter,
                                 child: Text(
-                                  error,
+                                  error.isNotEmpty ? error : state.error,
                                   style: AppText.medium14.copyWith(
                                     color: AppColor.redError,
                                   ),
-                                  maxLines: 2,
+                                  maxLines: 3,
                                   textAlign: TextAlign.center,
                                 ),
                               )

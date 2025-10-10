@@ -20,7 +20,7 @@ class User {
       family: data['family'] ?? '',
       name: data['name'] ?? '',
       patron: data['patron'] ?? '',
-      filePath: data['filePath'] ?? '${data['id']}_routers',
+      filePath: data['filePath'] ?? '${data['id']}_routers.json',
     );
   }
 

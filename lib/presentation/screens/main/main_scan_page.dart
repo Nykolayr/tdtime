@@ -13,7 +13,6 @@ import 'package:tdtime/domain/repository/routers_repository.dart';
 import 'package:tdtime/domain/repository/user_repository.dart';
 import 'package:tdtime/presentation/screens/main/bloc/main_bloc.dart';
 import 'package:tdtime/presentation/screens/main/get_position.dart';
-import 'package:tdtime/presentation/screens/main/widget.dart';
 import 'package:tdtime/presentation/theme/theme.dart';
 import 'package:tdtime/presentation/widgets/alerts.dart';
 import 'package:tdtime/presentation/widgets/app_bar.dart';
@@ -132,6 +131,32 @@ class MainScanPageState extends State<MainScanPage> {
   }
 
   void startSession() async {
+    // Проверяем, есть ли активная сессия
+    if (bloc.state.dayHystorySession.listSessions.isNotEmpty) {
+      SessionScan lastSession = bloc.state.dayHystorySession.listSessions.last;
+      if (lastSession.state != StateSession.close) {
+        // Есть активная сессия - переходим к сканированию DataMatrix
+        if (mounted) {
+          context.go('/main/matrix');
+        }
+        return;
+      }
+    }
+
+    // Проверяем, есть ли данные о маршрутах
+    final routersRepo = Get.find<RoutersRepository>();
+    if (routersRepo.weekRouters.isEmpty) {
+      // Нет данных о маршрутах - работа невозможна
+      if (mounted) {
+        showErrorAlert(
+          context,
+          'Нет данных о маршрутах. Обратитесь к администратору.',
+        );
+      }
+      return;
+    }
+
+    // Обычный режим - начинаем сессию с выбранной ТЦ
     isLoading = true;
     setState(() {});
     Position position = Position.fromMap({
@@ -146,9 +171,24 @@ class MainScanPageState extends State<MainScanPage> {
       'timestamp': 0,
     });
     try {
-      position = await determinePosition().timeout(const Duration(seconds: 3));
+      position = await determinePosition().timeout(const Duration(seconds: 10));
     } catch (e) {
       Logger.e('Ошибка при определения местоположения $e');
+      // Используем координаты по умолчанию если геолокация не работает
+      position = Position(
+        latitude: 0.0,
+        longitude: 0.0,
+        timestamp: DateTime.now(),
+        accuracy: 0.0,
+        altitude: 0.0,
+        altitudeAccuracy: 0.0,
+        heading: 0.0,
+        headingAccuracy: 0.0,
+        speed: 0.0,
+        speedAccuracy: 0.0,
+        isMocked: false,
+        floor: null,
+      );
     } finally {
       isLoading = false;
       setState(() {});
@@ -174,6 +214,7 @@ class MainScanPageState extends State<MainScanPage> {
     bool isCompleted = state.dayProgress['isCompleted'] as bool? ?? false;
     double progress = state.dayProgress['progress'] as double? ?? 0.0;
 
+    // Проверяем, это свободный график (нет данных о днях недели)
     if (total == 0) return const SizedBox.shrink();
 
     return Container(
@@ -368,17 +409,15 @@ class MainScanPageState extends State<MainScanPage> {
                   padding:
                       const EdgeInsets.symmetric(horizontal: 20, vertical: 40),
                   color: AppColor.blueFon,
-                  child: (state.dayHystorySession.listSessions.isEmpty)
-                      ? const EmptySession()
-                      : SingleChildScrollView(
-                          child: Column(
-                            children: [
-                              const Gap(70),
-                              // Прогресс дня
-                              _buildDayProgressWidget(state),
-                            ],
-                          ),
-                        ),
+                  child: SingleChildScrollView(
+                    child: Column(
+                      children: [
+                        const Gap(70),
+                        // Прогресс дня
+                        _buildDayProgressWidget(state),
+                      ],
+                    ),
+                  ),
                 ),
                 Positioned(
                   bottom: 170,
@@ -408,28 +447,37 @@ class MainScanPageState extends State<MainScanPage> {
                   child: Column(
                     children: [
                       if (state.shouldShowDaySelection) ...[
-                        Text(
-                          'На сегодняшний день, маршрут выполнен',
-                          style: AppText.medium14.copyWith(
-                            color: AppColor.white,
+                        // Показываем статус только если есть выполненные сессии
+                        if (state
+                            .dayHystorySession.listSessions.isNotEmpty) ...[
+                          Text(
+                            'На сегодняшний день, маршрут выполнен',
+                            style: AppText.medium14.copyWith(
+                              color: AppColor.white,
+                            ),
                           ),
-                        ),
-                        const Gap(8),
-                        _buildUploadStatusWidget(state),
+                          const Gap(8),
+                          _buildUploadStatusWidget(state),
+                        ],
                       ],
-                      if (state.todayRouters.isNotEmpty ||
-                          state.shouldShowDaySelection)
+                      if (state.shouldShowDaySelection) ...[
+                        // Всегда показываем кнопку для выбора дня (свободный график)
+                        ButtonWide(
+                          text: 'Начать работу',
+                          iconPath: 'assets/svg/reader.svg',
+                          onPressed: () {
+                            bloc.add(SelectDayEvent(day: selectedDay));
+                          },
+                        ),
+                      ] else if (state.todayRouters.isNotEmpty) ...[
                         ButtonWide(
                           text: 'Дальше',
                           iconPath: 'assets/svg/reader.svg',
                           onPressed: () {
-                            if (state.shouldShowDaySelection) {
-                              bloc.add(SelectDayEvent(day: selectedDay));
-                            } else {
-                              startSession();
-                            }
+                            startSession();
                           },
                         ),
+                      ],
                       const Gap(5),
                       if (state.dayHystorySession.listSessions.isNotEmpty) ...[
                         const Gap(10),
@@ -520,6 +568,8 @@ class MainScanPageState extends State<MainScanPage> {
       ],
     );
   }
+
+  /// Пустое состояние - показываем кнопку сканирования
 
   /// Кнопка отправки всех неотправленных сессий
   Widget _buildUploadAllButton(MainState state) {

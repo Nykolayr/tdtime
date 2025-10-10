@@ -30,19 +30,38 @@ class RoutersRepository {
   String errorMessage = '';
 
   // Инициализация данных
-  Future<void> init() async {
+  Future<bool> init() async {
     final user = Get.find<UserRepository>().user;
     if (user.id.isEmpty) {
-      return;
+      return false;
     }
+
     // Сначала пытаемся загрузить из локального хранилища
+    bool hasLocalData = false;
     try {
       await _loadFromLocal();
-      Logger.i('Данные загружены из локального хранилища');
+      hasLocalData = marketCenters.isNotEmpty || weekRouters.isNotEmpty;
+      if (hasLocalData) {
+        Logger.i('Данные загружены из локального хранилища');
+      }
     } catch (e) {
       Logger.e('Failed to load from local: $e');
-      // Если локальных данных нет, показываем ошибку
-      errorMessage = 'Нет доступа к интернету. Невозможно загрузить данные.';
+    }
+
+    // Если локальных данных нет, пытаемся загрузить с FTP
+    if (!hasLocalData) {
+      Logger.i('Нет локальных данных, пытаемся загрузить с FTP...');
+      try {
+        await _loadFromFtp();
+        if (marketCenters.isNotEmpty || weekRouters.isNotEmpty) {
+          Logger.i('Данные успешно загружены с FTP');
+        } else {
+          Logger.w('FTP загрузка не дала результатов');
+        }
+      } catch (e) {
+        Logger.e('Failed to load from FTP: $e');
+        errorMessage = 'Нет доступа к интернету. Невозможно загрузить данные.';
+      }
     }
 
     final today = getCurrentDay();
@@ -52,7 +71,10 @@ class RoutersRepository {
       // Новый день — обновляем todayRouters из weekRouters
       todayRouters = getMarketCentersForDay(day: today);
       await _saveTodayRouters();
-      await saveLastOpenedWeekDay(today);
+      // НЕ сохраняем lastOpenedWeekDay здесь, чтобы не мешать проверке первого входа
+      if (lastOpened != null) {
+        await saveLastOpenedWeekDay(today);
+      }
       Logger.i('Новый день: todayRouters обновлены из weekRouters');
     } else {
       // День тот же — todayRouters из локалки
@@ -66,8 +88,16 @@ class RoutersRepository {
       Logger.i('Тот же день: todayRouters из локалки');
     }
 
+    // Если нет данных о днях недели, блокируем работу
+    if (weekRouters.isEmpty) {
+      Logger.e('Нет данных о днях недели, работа невозможна');
+      errorMessage = 'Нет данных о маршрутах. Обратитесь к администратору.';
+      return false;
+    }
+
     // Восстанавливаем незавершенный день, если есть
     await restoreUnfinishedDay();
+    return true;
   }
 
   /// убираем выбранный ТЦ из списка точек на сегодня
@@ -78,7 +108,15 @@ class RoutersRepository {
 
   /// Выбор дня
   Future<void> selectDay(WeekDay day) async {
+    Logger.i('Выбираем день: $day');
+    Logger.i('Доступные weekRouters: ${weekRouters.length}');
+    for (var route in weekRouters) {
+      Logger.i('  - ${route.day}: ${route.marketCenterIds.length} ТЦ');
+    }
+
     todayRouters = getMarketCentersForDay(day: day);
+    Logger.i('Получено todayRouters: ${todayRouters.length}');
+
     await _saveTodayRouters();
   }
 
@@ -176,18 +214,25 @@ class RoutersRepository {
     final user = Get.find<UserRepository>().user;
     if (user.id.isEmpty) return;
 
+    Logger.i('Начинаем загрузку с FTP для пользователя: ${user.id}');
+    Logger.i('filePath: ${user.filePath}');
+
     try {
       // Загружаем список ТЦ
+      Logger.i('Загружаем all_tt.json...');
       final ttData = await Api().downloadJsonFile('all_tt.json');
       if (ttData['error'] == null) {
         marketCenters = (ttData['marketCenters'] as List)
             .map((mc) => MarketCenter.fromJson(mc))
             .toList();
+        Logger.i('Загружено ТЦ: ${marketCenters.length}');
       } else {
+        Logger.e('Ошибка загрузки all_tt.json: ${ttData['error']}');
         errorMessage = ttData['error'];
         return;
       }
       // Загружаем маршруты
+      Logger.i('Загружаем ${user.filePath}...');
       final routersData = await Api().downloadJsonFile(user.filePath);
       if (routersData['error'] == null) {
         weekRouters = (routersData['routers'] as List).map((r) {
@@ -204,8 +249,10 @@ class RoutersRepository {
             marketCenters: centers,
           );
         }).toList();
+        Logger.i('Загружено маршрутов: ${weekRouters.length}');
         isFileExist = true;
       } else {
+        Logger.e('Ошибка загрузки ${user.filePath}: ${routersData['error']}');
         isFileExist = false;
         errorMessage = routersData['error'];
         return;

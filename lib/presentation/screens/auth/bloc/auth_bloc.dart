@@ -15,19 +15,31 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
   /// авторизация по логину и паролю
   Future<void> _onAuthEvent(
       AuthUserEvent event, Emitter<AuthState> emit) async {
-    emit(state.copyWith(isLoading: true, isSucsess: false));
+    emit(state.copyWith(isLoading: true, isSucsess: false, error: ''));
     User user = User(
         family: event.family,
         name: event.name,
         patron: event.patron,
         id: event.id,
-        filePath: '${event.id}_routers');
+        filePath: '${event.id}_routers.json');
 
-    await Get.find<UserRepository>().authUser(userIn: user);
-    emit(state.copyWith(
-      user: user,
-      isSucsess: true,
-      isLoading: false,
-    ));
+    bool authSuccess = await Get.find<UserRepository>().authUser(userIn: user);
+
+    if (authSuccess) {
+      emit(state.copyWith(
+        user: user,
+        isSucsess: true,
+        isLoading: false,
+        error: '',
+      ));
+    } else {
+      emit(state.copyWith(
+        user: user,
+        isSucsess: false,
+        isLoading: false,
+        error:
+            'Не удалось загрузить данные. Проверьте подключение к интернету и правильность ID пользователя.',
+      ));
+    }
   }
 }

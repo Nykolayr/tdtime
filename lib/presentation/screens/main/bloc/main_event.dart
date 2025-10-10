@@ -114,3 +114,6 @@ class GetDayProgressEvent extends MainEvent {}
 
 /// начало нового дня
 class StartNewDayEvent extends MainEvent {}
+
+/// проверка первого входа пользователя
+class CheckFirstLoginEvent extends MainEvent {}
