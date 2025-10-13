@@ -17,6 +17,8 @@ class MainState extends Equatable {
   final Map<String, dynamic> dayProgress;
   final bool shouldShowDaySelection;
   final bool isFirstLogin;
+  final bool isFreeMode;
+  final bool isRouters;
 
   const MainState({
     required this.isLoading,
@@ -35,6 +37,8 @@ class MainState extends Equatable {
     required this.dayProgress,
     required this.shouldShowDaySelection,
     required this.isFirstLogin,
+    required this.isFreeMode,
+    required this.isRouters,
   });
 
   MainState copyWith({
@@ -54,6 +58,8 @@ class MainState extends Equatable {
     Map<String, dynamic>? dayProgress,
     bool? shouldShowDaySelection,
     bool? isFirstLogin,
+    bool? isFreeMode,
+    bool? isRouters,
   }) {
     return MainState(
       isLoading: isLoading ?? this.isLoading,
@@ -73,6 +79,8 @@ class MainState extends Equatable {
       shouldShowDaySelection:
           shouldShowDaySelection ?? this.shouldShowDaySelection,
       isFirstLogin: isFirstLogin ?? this.isFirstLogin,
+      isFreeMode: isFreeMode ?? this.isFreeMode,
+      isRouters: isRouters ?? this.isRouters,
     );
   }
 
@@ -106,6 +114,8 @@ class MainState extends Equatable {
         dayProgress: {},
         shouldShowDaySelection: false,
         isFirstLogin: false,
+        isFreeMode: false,
+        isRouters: false,
       );
 
   @override
@@ -124,5 +134,7 @@ class MainState extends Equatable {
         dayProgress,
         shouldShowDaySelection,
         isFirstLogin,
+        isFreeMode,
+        isRouters,
       ];
 }

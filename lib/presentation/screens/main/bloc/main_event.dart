@@ -117,3 +117,9 @@ class StartNewDayEvent extends MainEvent {}
 
 /// проверка первого входа пользователя
 class CheckFirstLoginEvent extends MainEvent {}
+
+/// установка свободного режима
+class SetFreeModeEvent extends MainEvent {
+  final bool isFreeMode;
+  const SetFreeModeEvent({required this.isFreeMode});
+}

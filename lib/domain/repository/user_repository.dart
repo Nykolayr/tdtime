@@ -348,13 +348,21 @@ class UserRepository {
     required String id,
     required Position position,
   }) {
-    final result = lastDay.listSessions.firstWhereOrNull((e) => e.id == id);
-    Logger.i('addHystorySessions ${lastDay.listSessions.length} $id $position');
+    // Генерируем уникальный ID для сессии на основе ID торговой точки
+    // В свободном режиме используем только название ТТ, в обычном - добавляем timestamp
+    String sessionId = id.isNotEmpty
+        ? '${id}_${DateTime.now().millisecondsSinceEpoch}'
+        : 'free_${DateTime.now().millisecondsSinceEpoch}';
+
+    final result =
+        lastDay.listSessions.firstWhereOrNull((e) => e.id == sessionId);
+    Logger.i(
+        'addHystorySessions ${lastDay.listSessions.length} sessionId=$sessionId, ttId=$id, position=$position');
     if (result != null) {
       return 'Эту сессию вы уже сканировали!';
     } else {
       SessionScan tempSession = SessionScan.init();
-      tempSession.id = id;
+      tempSession.id = sessionId; // Используем уникальный ID сессии
       tempSession.position = position;
       tempSession.time = DateTime.now();
       lastDay.addSession(tempSession);
@@ -395,12 +403,9 @@ class UserRepository {
     bool dataLoaded = await Get.find<RoutersRepository>().init();
 
     if (!dataLoaded) {
-      // Данные не загружены - показываем ошибку и не переходим дальше
-      Get.find<MainBloc>().add(ShowErrorEvent(
-        error:
-            'Не удалось загрузить данные. Проверьте подключение к интернету и правильность ID пользователя.',
-      ));
-      return false;
+      // Данные не загружены - но продолжаем работу в свободном режиме
+      Logger.w('Данные не загружены, но продолжаем работу в свободном режиме');
+      // Не показываем ошибку, просто продолжаем
     }
 
     // Только после успешной загрузки данных проверяем первый заход

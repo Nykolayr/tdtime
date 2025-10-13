@@ -29,6 +29,9 @@ class RoutersRepository {
   // Сообщение об ошибке
   String errorMessage = '';
 
+  // Флаг наличия роутеров
+  bool isRouters = false;
+
   // Инициализация данных
   Future<bool> init() async {
     final user = Get.find<UserRepository>().user;
@@ -36,13 +39,22 @@ class RoutersRepository {
       return false;
     }
 
+    // Очищаем предыдущие данные при новой инициализации
+    marketCenters.clear();
+    weekRouters.clear();
+    todayRouters.clear();
+    errorMessage = '';
+    isRouters = false;
+
     // Сначала пытаемся загрузить из локального хранилища
     bool hasLocalData = false;
     try {
       await _loadFromLocal();
-      hasLocalData = marketCenters.isNotEmpty || weekRouters.isNotEmpty;
+      hasLocalData = marketCenters.isNotEmpty && weekRouters.isNotEmpty;
       if (hasLocalData) {
         Logger.i('Данные загружены из локального хранилища');
+      } else {
+        Logger.i('Локальных данных нет или они неполные');
       }
     } catch (e) {
       Logger.e('Failed to load from local: $e');
@@ -53,14 +65,16 @@ class RoutersRepository {
       Logger.i('Нет локальных данных, пытаемся загрузить с FTP...');
       try {
         await _loadFromFtp();
-        if (marketCenters.isNotEmpty || weekRouters.isNotEmpty) {
+        if (marketCenters.isNotEmpty && weekRouters.isNotEmpty) {
           Logger.i('Данные успешно загружены с FTP');
         } else {
           Logger.w('FTP загрузка не дала результатов');
         }
       } catch (e) {
         Logger.e('Failed to load from FTP: $e');
-        errorMessage = 'Нет доступа к интернету. Невозможно загрузить данные.';
+        // Не устанавливаем errorMessage при отсутствии интернета - работаем с локальными данными
+        Logger.w(
+            'FTP недоступен, работаем с локальными данными или в свободном режиме');
       }
     }
 
@@ -88,11 +102,12 @@ class RoutersRepository {
       Logger.i('Тот же день: todayRouters из локалки');
     }
 
-    // Если нет данных о днях недели, блокируем работу
-    if (weekRouters.isEmpty) {
-      Logger.e('Нет данных о днях недели, работа невозможна');
-      errorMessage = 'Нет данных о маршрутах. Обратитесь к администратору.';
-      return false;
+    // Устанавливаем флаг наличия роутеров
+    isRouters = weekRouters.isNotEmpty;
+    if (isRouters) {
+      Logger.i('Режим с роутерами: weekRouters = ${weekRouters.length}');
+    } else {
+      Logger.i('Свободный режим: weekRouters пустой');
     }
 
     // Восстанавливаем незавершенный день, если есть
@@ -158,12 +173,30 @@ class RoutersRepository {
         .where((session) => session.state == StateSession.close)
         .toList();
 
+    int completed = closedSessions.length;
+
+    Logger.i('getDayProgress: weekRouters.isEmpty = ${weekRouters.isEmpty}');
+    Logger.i(
+        'getDayProgress: total sessions = ${user.lastDay.listSessions.length}');
+    Logger.i('getDayProgress: closed sessions = $completed');
+
+    // СВОБОДНЫЙ РЕЖИМ - просто количество обработанных точек
+    if (!isRouters) {
+      Logger.i('getDayProgress: Свободный режим - completed = $completed');
+      return {
+        'total': 0, // Не показываем "из X"
+        'completed': completed,
+        'remaining': 0,
+        'isCompleted': false,
+        'progress': 0.0, // Нет прогресс-бара
+      };
+    }
+
     // Получаем полный список торговых точек для сегодняшнего дня
     List<MarketCenter> fullDayRouters =
         getMarketCentersForDay(day: getCurrentDay());
 
     int total = fullDayRouters.length;
-    int completed = closedSessions.length;
     int remaining = todayRouters.length;
 
     return {
@@ -226,15 +259,25 @@ class RoutersRepository {
             .map((mc) => MarketCenter.fromJson(mc))
             .toList();
         Logger.i('Загружено ТЦ: ${marketCenters.length}');
+        errorMessage = ''; // Очищаем ошибку при успешной загрузке
       } else {
         Logger.e('Ошибка загрузки all_tt.json: ${ttData['error']}');
         errorMessage = ttData['error'];
         return;
       }
+      // ВРЕМЕННАЯ ЗАГЛУШКА ДЛЯ ТЕСТИРОВАНИЯ СВОБОДНОГО РЕЖИМА
       // Загружаем маршруты
       Logger.i('Загружаем ${user.filePath}...');
       final routersData = await Api().downloadJsonFile(user.filePath);
       if (routersData['error'] == null) {
+        // ВРЕМЕННО: Создаем пустой список маршрутов для тестирования свободного режима
+        weekRouters = [];
+        Logger.i(
+            'ТЕСТ: Создан пустой список маршрутов для проверки свободного режима');
+        isFileExist = true;
+
+        // Закомментированный оригинальный код:
+        /*
         weekRouters = (routersData['routers'] as List).map((r) {
           final ids = (r['marketCenterIds'] as List)
               .map((id) => id.toString())
@@ -250,7 +293,7 @@ class RoutersRepository {
           );
         }).toList();
         Logger.i('Загружено маршрутов: ${weekRouters.length}');
-        isFileExist = true;
+        */
       } else {
         Logger.e('Ошибка загрузки ${user.filePath}: ${routersData['error']}');
         isFileExist = false;
@@ -259,14 +302,24 @@ class RoutersRepository {
       }
 
       // Если данные успешно загружены, сохраняем их локально
-      if (marketCenters.isNotEmpty && weekRouters.isNotEmpty) {
+      if (marketCenters.isNotEmpty) {
+        errorMessage = ''; // Очищаем ошибку при успешной загрузке
         await _saveToLocal();
+        Logger.i(
+            'ТЕСТ: Данные сохранены локально (weekRouters пустой для тестирования)');
       } else {
         throw 'Failed to load data from FTP';
       }
     } catch (e) {
       Logger.e('Failed to load from FTP: $e');
-      errorMessage = e.toString();
+      // Не устанавливаем errorMessage при отсутствии интернета - работаем с локальными данными
+      if (e.toString().contains('SocketException') ||
+          e.toString().contains('No Internet')) {
+        Logger.w(
+            'FTP недоступен из-за отсутствия интернета, работаем с локальными данными');
+      } else {
+        errorMessage = e.toString();
+      }
       return;
     }
   }
@@ -338,6 +391,9 @@ class RoutersRepository {
       // Если локальных данных нет, просто логируем
       if (marketCenters.isEmpty || weekRouters.isEmpty) {
         Logger.i('No local data found.');
+        // Очищаем частично загруженные данные
+        marketCenters.clear();
+        weekRouters.clear();
         return;
       }
     } catch (e) {

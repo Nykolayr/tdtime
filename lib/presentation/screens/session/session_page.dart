@@ -98,7 +98,7 @@ class DataMatrixScanPageState extends State<DataMatrixScanPage> {
             return Scaffold(
               extendBodyBehindAppBar: true,
               appBar: AppBars(
-                title: 'ТТ №${state.curSession.id}',
+                title: 'ТТ ${state.curSession.id.split('_')[0]}',
                 isBack: false,
                 isLeft: true,
               ),
@@ -154,20 +154,7 @@ class DataMatrixScanPageState extends State<DataMatrixScanPage> {
                           onPressed: exitScanning,
                         ),
                         const Gap(10),
-                        SizedBox(
-                          height: 50,
-                          child: (state.error.isNotEmpty || error.isNotEmpty)
-                              ? Text(
-                                  state.error.isNotEmpty ? state.error : error,
-                                  style: AppText.medium14.copyWith(
-                                    color: AppColor.redError,
-                                  ),
-                                  softWrap: true,
-                                  maxLines: 4,
-                                  textAlign: TextAlign.center,
-                                )
-                              : null,
-                        ),
+                        // Убираем показ ошибок на странице ТТ
                       ],
                     ),
                   ),

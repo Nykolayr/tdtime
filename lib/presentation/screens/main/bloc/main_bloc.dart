@@ -38,6 +38,7 @@ class MainBloc extends Bloc<MainEvent, MainState> {
     on<GetDayProgressEvent>(_onGetDayProgressEvent);
     on<StartNewDayEvent>(_onStartNewDayEvent);
     on<CheckFirstLoginEvent>(_onCheckFirstLoginEvent);
+    on<SetFreeModeEvent>(_onSetFreeModeEvent);
   }
 
   /// новый файл
@@ -219,9 +220,12 @@ class MainBloc extends Bloc<MainEvent, MainState> {
     String answer =
         repoUser.addHystorySessions(id: event.id, position: event.position);
     if (answer.isNotEmpty) {
-      emit(state.copyWith(error: answer));
-      await Future.delayed(const Duration(seconds: 6));
-      emit(state.copyWith(error: ''));
+      // Показываем ошибку FTP только в режиме маршрутов, не в свободном режиме
+      if (state.isRouters) {
+        emit(state.copyWith(error: answer));
+        await Future.delayed(const Duration(seconds: 6));
+        emit(state.copyWith(error: ''));
+      }
     } else {
       MarketCenter marketCenter = MarketCenter.init();
       if (repoRouters.todayRouters.isNotEmpty) {
@@ -316,15 +320,25 @@ class MainBloc extends Bloc<MainEvent, MainState> {
       // Обновляем прогресс дня после закрытия сессии
       RoutersRepository routersRepo = Get.find<RoutersRepository>();
 
-      // Удаляем обработанную торговую точку из списка
-      if (state.selectedMarketCenter.id.isNotEmpty) {
+      // Удаляем обработанную торговую точку из списка (только в обычном режиме)
+      if (state.selectedMarketCenter.id.isNotEmpty && !state.isFreeMode) {
         routersRepo.removeMarketCenter(state.selectedMarketCenter);
       }
 
       Map<String, dynamic> progress = routersRepo.getDayProgress();
+      Logger.i('_onCloseSessionEvent: progress = $progress');
 
       // Обновляем состояние неотправленных сессий
       Map<String, dynamic> unsentSessions = repo.getAllUnsentSessions();
+
+      Logger.i(
+          '_onCloseSessionEvent: обновляем состояние - dayHystorySession.listSessions.length = ${repo.lastDay.listSessions.length}');
+      Logger.i(
+          '_onCloseSessionEvent: обновляем состояние - progress = $progress');
+      Logger.i(
+          '_onCloseSessionEvent: обновляем состояние - hasUnsentSessions = ${unsentSessions['hasUnsent']}');
+      Logger.i(
+          '_onCloseSessionEvent: обновляем состояние - unsentSessions = ${unsentSessions['unsentByDay']}');
 
       emit(state.copyWith(
         dayHystorySession: repo.lastDay,
@@ -334,6 +348,7 @@ class MainBloc extends Bloc<MainEvent, MainState> {
         unsentSessions:
             unsentSessions['unsentByDay'] as Map<String, List<SessionScan>>,
         hasUnsentSessions: unsentSessions['hasUnsent'] as bool,
+        isRouters: routersRepo.isRouters,
       ));
     }
   }
@@ -424,11 +439,19 @@ class MainBloc extends Bloc<MainEvent, MainState> {
   /// получение прогресса дня
   Future<void> _onGetDayProgressEvent(
       GetDayProgressEvent event, Emitter<MainState> emit) async {
-    RoutersRepository repo = Get.find<RoutersRepository>();
-    Map<String, dynamic> progress = repo.getDayProgress();
+    RoutersRepository routersRepo = Get.find<RoutersRepository>();
+    UserRepository userRepo = Get.find<UserRepository>();
+
+    Map<String, dynamic> progress = routersRepo.getDayProgress();
+    Map<String, dynamic> unsentSessions = userRepo.getAllUnsentSessions();
 
     emit(state.copyWith(
       dayProgress: progress,
+      dayHystorySession: userRepo.lastDay,
+      unsentSessions:
+          unsentSessions['unsentByDay'] as Map<String, List<SessionScan>>,
+      hasUnsentSessions: unsentSessions['hasUnsent'] as bool,
+      isRouters: routersRepo.isRouters,
     ));
   }
 
@@ -475,12 +498,13 @@ class MainBloc extends Bloc<MainEvent, MainState> {
         shouldShowDaySelection: true,
       ));
     } else if (!hasWeekRouters) {
-      // Нет данных о днях недели - блокируем работу
-      Logger.e('Нет данных о днях недели, работа невозможна');
+      // ТЕСТ: Временно не блокируем работу для тестирования свободного режима
+      Logger.w(
+          'ТЕСТ: Нет данных о днях недели - будет включен свободный режим');
       emit(state.copyWith(
         isFirstLogin: false,
         shouldShowDaySelection: false,
-        error: 'Нет данных о маршрутах. Обратитесь к администратору.',
+        // error: 'Нет данных о маршрутах. Обратитесь к администратору.',
       ));
     } else {
       // Пользователь уже работал ранее
@@ -490,5 +514,11 @@ class MainBloc extends Bloc<MainEvent, MainState> {
         shouldShowDaySelection: false,
       ));
     }
+  }
+
+  /// установка свободного режима
+  Future<void> _onSetFreeModeEvent(
+      SetFreeModeEvent event, Emitter<MainState> emit) async {
+    emit(state.copyWith(isFreeMode: event.isFreeMode));
   }
 }
