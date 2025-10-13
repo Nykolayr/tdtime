@@ -167,7 +167,7 @@ class MainBloc extends Bloc<MainEvent, MainState> {
       completedTT: completedTT,
       unsentTT: unsentTT,
       isTotalDay: isTotalDay,
-      isRouters: true,
+      isFree: repo.todayRouters.isEmpty,
     ));
   }
 
@@ -251,13 +251,15 @@ class MainBloc extends Bloc<MainEvent, MainState> {
   /// начало сессии
   Future<void> _onBeginSessinonEvent(
       BeginSessinonEvent event, Emitter<MainState> emit) async {
+    Logger.i(
+        '_onBeginSessinonEvent: id=${event.id}, sessionId=${event.sessionId}');
     UserRepository repoUser = Get.find<UserRepository>();
     RoutersRepository repoRouters = Get.find<RoutersRepository>();
     String answer = repoUser.addHystorySessions(
         id: event.id, sessionId: event.sessionId, position: event.position);
     if (answer.isNotEmpty) {
       // Показываем ошибку FTP только в режиме маршрутов, не в свободном режиме
-      if (state.isRouters) {
+      if (!state.isFree) {
         emit(state.copyWith(error: answer));
         await Future.delayed(const Duration(seconds: 6));
         emit(state.copyWith(error: ''));
@@ -329,12 +331,13 @@ class MainBloc extends Bloc<MainEvent, MainState> {
   /// закрытие сессии
   Future<void> _onCloseSessionEvent(
       CloseSessionEvent event, Emitter<MainState> emit) async {
-    // Сессия уже закрыта в UserRepository, теперь обрабатываем ее окончательно
     UserRepository repo = Get.find<UserRepository>();
     RoutersRepository routersRepo = Get.find<RoutersRepository>();
 
+    // В свободном режиме сессия должна быть добавлена при начале, не при закрытии
+
     // Удаляем обработанную торговую точку из списка (только в обычном режиме)
-    if (state.selectedMarketCenter.id.isNotEmpty && !state.isFreeMode) {
+    if (state.selectedMarketCenter.id.isNotEmpty && !state.isFree) {
       routersRepo.removeMarketCenter(state.selectedMarketCenter);
     }
 
@@ -342,7 +345,10 @@ class MainBloc extends Bloc<MainEvent, MainState> {
     int newCompletedTT = state.completedTT + 1;
 
     // Проверяем, отправилась ли последняя сессия
-    bool isLastSessionUploaded = repo.lastDay.listSessions.last.isUploaded;
+    bool isLastSessionUploaded = false;
+    if (repo.lastDay.listSessions.isNotEmpty) {
+      isLastSessionUploaded = repo.lastDay.listSessions.last.isUploaded;
+    }
     int newUnsentTT = state.unsentTT + (isLastSessionUploaded ? 0 : 1);
 
     // Проверяем, все ли ТТ обработаны
@@ -357,14 +363,17 @@ class MainBloc extends Bloc<MainEvent, MainState> {
 
     emit(state.copyWith(
       dayHystorySession: repo.lastDay,
-      curSession: repo.lastDay.listSessions.last,
+      curSession: repo.lastDay.listSessions.isNotEmpty
+          ? repo.lastDay.listSessions.last
+          : state.curSession,
       todayRouters: routersRepo.todayRouters,
       completedTT: newCompletedTT,
       unsentTT: newUnsentTT,
       isTotalDay: isTotalDay,
       shouldShowDaySelection: false, // Скрываем выбор дня после первой ТТ
-      // Если все ТТ завершены, показываем сообщение о завершении
-      error: isTotalDay ? 'Все торговые точки обработаны!' : '',
+      // Если все ТТ завершены, показываем сообщение о завершении (только в режиме роутеров)
+      error:
+          (isTotalDay && !state.isFree) ? 'Все торговые точки обработаны!' : '',
     ));
   }
 
@@ -387,6 +396,17 @@ class MainBloc extends Bloc<MainEvent, MainState> {
       RoutersRepository routersRepo = Get.find<RoutersRepository>();
       Map<String, dynamic> progress = routersRepo.getDayProgress();
 
+      // Обновляем новые поля прогресса
+      int totalTT = routersRepo.todayRouters.length;
+      int completedTT = repo.lastDay.listSessions.length;
+      int unsentTT = 0; // После успешной отправки неотправленных нет
+      bool isTotalDay = completedTT == totalTT;
+      bool hasUnsentSessions =
+          false; // После успешной отправки неотправленных нет
+
+      Logger.i(
+          '_onForceUploadAllSessionsEvent: после отправки hasUnsentSessions = $hasUnsentSessions, unsentTT = $unsentTT');
+
       emit(state.copyWith(
         dayHystorySession: repo.lastDay,
         curSession: repo.lastDay.listSessions.isNotEmpty
@@ -394,8 +414,14 @@ class MainBloc extends Bloc<MainEvent, MainState> {
             : SessionScan.init(),
         unsentSessions:
             unsentSessions['unsentByDay'] as Map<String, List<SessionScan>>,
-        hasUnsentSessions: unsentSessions['hasUnsent'] as bool,
+        hasUnsentSessions:
+            hasUnsentSessions, // Принудительно устанавливаем false
         dayProgress: progress,
+        // Обновляем новые поля прогресса
+        totalTT: totalTT,
+        completedTT: completedTT,
+        unsentTT: unsentTT,
+        isTotalDay: isTotalDay,
       ));
     }
   }
@@ -466,7 +492,6 @@ class MainBloc extends Bloc<MainEvent, MainState> {
       unsentSessions:
           unsentSessions['unsentByDay'] as Map<String, List<SessionScan>>,
       hasUnsentSessions: unsentSessions['hasUnsent'] as bool,
-      isRouters: routersRepo.isRouters,
     ));
   }
 

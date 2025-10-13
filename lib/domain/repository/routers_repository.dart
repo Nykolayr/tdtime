@@ -102,12 +102,12 @@ class RoutersRepository {
       Logger.i('Тот же день: todayRouters из локалки');
     }
 
-    // Устанавливаем флаг наличия роутеров
-    isRouters = weekRouters.isNotEmpty;
+    // Устанавливаем флаг наличия роутеров на основе todayRouters
+    isRouters = todayRouters.isNotEmpty;
     if (isRouters) {
-      Logger.i('Режим с роутерами: weekRouters = ${weekRouters.length}');
+      Logger.i('Режим с роутерами: todayRouters = ${todayRouters.length}');
     } else {
-      Logger.i('Свободный режим: weekRouters пустой');
+      Logger.i('Свободный режим: todayRouters пустой');
     }
 
     // Восстанавливаем незавершенный день, если есть
@@ -455,13 +455,20 @@ class RoutersRepository {
 
   // Получение списка торговых центров для конкретного дня
   List<MarketCenter> getMarketCentersForDay({WeekDay? day}) {
-    day ??= getCurrentDay();
-    final route = getRoutersByDay(day);
-    if (route == null) return [];
+    // ВРЕМЕННАЯ ЗАГЛУШКА ДЛЯ ТЕСТИРОВАНИЯ СВОБОДНОГО РЕЖИМА
+    // TODO: Удалить после тестирования
+    Logger.i(
+        'getMarketCentersForDay: ВРЕМЕННАЯ ЗАГЛУШКА - возвращаем пустой список для тестирования свободного режима');
+    return [];
 
-    return route.marketCenterIds.map((id) {
-      return getMarketCenterById(id) ?? MarketCenter.init();
-    }).toList();
+    // Оригинальный код (закомментирован для тестирования):
+    // day ??= getCurrentDay();
+    // final route = getRoutersByDay(day);
+    // if (route == null) return [];
+
+    // return route.marketCenterIds.map((id) {
+    //   return getMarketCenterById(id) ?? MarketCenter.init();
+    // }).toList();
   }
 
   /// получение текущего дня недели

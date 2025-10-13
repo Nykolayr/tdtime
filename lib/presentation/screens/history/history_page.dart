@@ -37,6 +37,13 @@ class _HistoryPageState extends State<HistoryPage> {
       ),
       body: BlocBuilder<MainBloc, MainState>(
         bloc: bloc,
+        buildWhen: (previous, current) {
+          // Обновляем UI при изменении неотправленных сессий
+          return previous.unsentSessions != current.unsentSessions ||
+              previous.hasUnsentSessions != current.hasUnsentSessions ||
+              previous.dayHystorySession.listSessions.length !=
+                  current.dayHystorySession.listSessions.length;
+        },
         builder: (context, state) {
           return Container(
             height: MediaQuery.of(context).size.height,
@@ -89,6 +96,9 @@ class _HistoryPageState extends State<HistoryPage> {
     for (var sessions in state.unsentSessions.values) {
       totalUnsent += sessions.length;
     }
+
+    print(
+        '_buildUploadButton: totalUnsent = $totalUnsent, hasUnsentSessions = ${state.hasUnsentSessions}');
 
     // Показываем кнопку только если есть неотправленные сессии
     if (totalUnsent == 0) return const SizedBox.shrink();

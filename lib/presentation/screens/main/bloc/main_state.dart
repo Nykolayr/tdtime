@@ -18,7 +18,7 @@ class MainState extends Equatable {
   final bool shouldShowDaySelection;
   final bool isFirstLogin;
   final bool isFreeMode;
-  final bool isRouters;
+  final bool isFree; // Свободный режим на основе загруженных роутеров
 
   // Новые поля для простого подсчета
   final int totalTT; // Общее количество ТТ на день
@@ -44,7 +44,7 @@ class MainState extends Equatable {
     required this.shouldShowDaySelection,
     required this.isFirstLogin,
     required this.isFreeMode,
-    required this.isRouters,
+    required this.isFree,
     required this.totalTT,
     required this.completedTT,
     required this.unsentTT,
@@ -69,7 +69,7 @@ class MainState extends Equatable {
     bool? shouldShowDaySelection,
     bool? isFirstLogin,
     bool? isFreeMode,
-    bool? isRouters,
+    bool? isFree,
     int? totalTT,
     int? completedTT,
     int? unsentTT,
@@ -94,7 +94,7 @@ class MainState extends Equatable {
           shouldShowDaySelection ?? this.shouldShowDaySelection,
       isFirstLogin: isFirstLogin ?? this.isFirstLogin,
       isFreeMode: isFreeMode ?? this.isFreeMode,
-      isRouters: isRouters ?? this.isRouters,
+      isFree: isFree ?? this.isFree,
       totalTT: totalTT ?? this.totalTT,
       completedTT: completedTT ?? this.completedTT,
       unsentTT: unsentTT ?? this.unsentTT,
@@ -133,7 +133,7 @@ class MainState extends Equatable {
         shouldShowDaySelection: false,
         isFirstLogin: false,
         isFreeMode: false,
-        isRouters: Get.find<RoutersRepository>().isRouters,
+        isFree: Get.find<RoutersRepository>().todayRouters.isEmpty,
         totalTT: Get.find<RoutersRepository>().todayRouters.length,
         completedTT: Get.find<UserRepository>().hystorySessions.isNotEmpty
             ? Get.find<UserRepository>()
@@ -163,7 +163,7 @@ class MainState extends Equatable {
         shouldShowDaySelection,
         isFirstLogin,
         isFreeMode,
-        isRouters,
+        isFree,
         totalTT,
         completedTT,
         unsentTT,

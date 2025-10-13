@@ -14,6 +14,7 @@ import 'package:tdtime/domain/repository/routers_repository.dart';
 import 'package:tdtime/domain/repository/user_repository.dart';
 import 'package:tdtime/presentation/screens/main/bloc/main_bloc.dart';
 import 'package:tdtime/presentation/screens/main/get_position.dart';
+import 'package:tdtime/presentation/screens/main/widgets/free_mode_progress_widget.dart';
 import 'package:tdtime/presentation/theme/theme.dart';
 import 'package:tdtime/presentation/widgets/alerts.dart';
 import 'package:tdtime/presentation/widgets/app_bar.dart';
@@ -71,37 +72,47 @@ class MainScanPageState extends State<MainScanPage> {
   }
 
   void _onRouteChanged() {
-    final currentLocation = GoRouterState.of(context).uri.toString();
-
-    // Если вернулись на главную страницу из сканирования в свободном режиме
-    if (currentLocation == '/main' && !bloc.state.isRouters) {
-      // Закрываем сессию автоматически
-      bloc.add(CloseSessionEvent());
-    }
+    // Убираем автоматическое закрытие сессии - пользователь должен закрывать вручную
+    // final currentLocation = GoRouterState.of(context).uri.toString();
+    // if (currentLocation == '/main' && bloc.state.isFree) {
+    //   // Закрываем сессию автоматически
+    //   bloc.add(CloseSessionEvent());
+    // }
   }
 
   /// Проверка свободного режима
   void _checkFreeMode() async {
-    await Future.delayed(const Duration(milliseconds: 500));
+    await Future.delayed(
+        const Duration(milliseconds: 1000)); // Увеличиваем задержку
 
     if (mounted) {
       final routersRepo = Get.find<RoutersRepository>();
       final state = bloc.state;
 
+      Logger.i('_checkFreeMode: isFree = ${state.isFree}');
+      Logger.i(
+          '_checkFreeMode: weekRouters.length = ${routersRepo.weekRouters.length}');
+      Logger.i('_checkFreeMode: isFileExist = ${routersRepo.isFileExist}');
+
       // Если есть ошибка загрузки, не переходим дальше - остаемся на авторизации
       if (state.error.isNotEmpty || state.errorShowMessage.isNotEmpty) {
+        Logger.i('_checkFreeMode: есть ошибка, выходим');
         return;
       }
 
-      // Если файл не загрузился (нет данных), не переходим дальше
-      if (!routersRepo.isFileExist) {
-        return;
-      }
+      // Убираем проверку isFileExist, так как данные уже загружены
+      // if (!routersRepo.isFileExist) {
+      //   Logger.i('_checkFreeMode: файл не загружен, выходим');
+      //   return;
+      // }
 
       // Если нет маршрутов, но файл загрузился - включаем свободный режим
-      if (routersRepo.weekRouters.isEmpty) {
+      if (state.isFree) {
+        Logger.i('_checkFreeMode: isFree = true, показываем попап');
         bloc.add(const SetFreeModeEvent(isFreeMode: true));
         await showFreeModeDialog();
+      } else {
+        Logger.i('_checkFreeMode: isFree = false, попап не показываем');
       }
     }
   }
@@ -297,11 +308,14 @@ class MainScanPageState extends State<MainScanPage> {
   }
 
   void startSession({String? ttName}) async {
+    Logger.i('startSession: ВЫЗВАН с ttName=$ttName');
     // Проверяем, есть ли активная сессия
     if (bloc.state.dayHystorySession.listSessions.isNotEmpty) {
       SessionScan lastSession = bloc.state.dayHystorySession.listSessions.last;
       if (lastSession.state != StateSession.close) {
         // Есть активная сессия - переходим к сканированию DataMatrix
+        Logger.i(
+            'startSession: есть активная сессия, переходим к сканированию');
         if (mounted) {
           context.go('/main/matrix');
         }
@@ -347,14 +361,14 @@ class MainScanPageState extends State<MainScanPage> {
     }
 
     // В свободном режиме используем переданное название ТТ, в обычном - ID из маршрута
-    String ttId = bloc.state.isRouters
+    String ttId = !bloc.state.isFree
         ? bloc.state.selectedMarketCenter.id
         : (ttName ?? bloc.state.selectedMarketCenter.name);
 
     // Генерируем уникальный sessionId для каждой сессии
     String sessionId = '${ttId}_${DateTime.now().millisecondsSinceEpoch}';
 
-    Logger.i('startSession: isRouters = ${bloc.state.isRouters}');
+    Logger.i('startSession: isFree = ${bloc.state.isFree}');
     Logger.i(
         'startSession: selectedMarketCenter.id = ${bloc.state.selectedMarketCenter.id}');
     Logger.i(
@@ -363,14 +377,15 @@ class MainScanPageState extends State<MainScanPage> {
     Logger.i('startSession: ttId = $ttId');
     Logger.i('startSession: sessionId = $sessionId');
 
+    // Добавляем сессию в любом режиме
     bloc.add(
         BeginSessinonEvent(id: ttId, sessionId: sessionId, position: position));
 
-    isLoading = false;
-    setState(() {});
-
     // Ждем немного для обработки события и переходим
     await Future.delayed(const Duration(milliseconds: 500));
+
+    isLoading = false;
+    setState(() {});
 
     if (mounted) {
       context.go('/main/matrix');
@@ -446,13 +461,43 @@ class MainScanPageState extends State<MainScanPage> {
     int unsent = state.unsentTT;
     bool isTotalDay = state.isTotalDay;
 
-    // Не показываем виджет если нет данных
-    if (total == 0) return const SizedBox.shrink();
-
-    // СВОБОДНЫЙ РЕЖИМ - упрощенный виджет
-    if (!state.isRouters) {
-      return _buildFreeModeProgressWidget(state, completed);
+    // СВОБОДНЫЙ РЕЖИМ - используем отдельный виджет
+    if (state.isFree) {
+      return FreeModeProgressWidget(
+        completedTT: completed,
+        unsentTT: unsent,
+        onViewHistory: () {
+          GoRouter.of(context).go('/main/history');
+        },
+        onUploadAll: unsent > 0
+            ? () async {
+                try {
+                  bloc.add(ForceUploadAllSessionsEvent());
+                  // Показываем сообщение о начале отправки
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Отправка сессий...'),
+                      backgroundColor: AppColor.blue,
+                    ),
+                  );
+                } catch (e) {
+                  if (mounted) {
+                    await showErrorAlert(
+                      context,
+                      'Ошибка отправки: $e',
+                      onOk: () {
+                        // Просто закрываем диалог, не делаем дополнительных действий
+                      },
+                    );
+                  }
+                }
+              }
+            : null,
+      );
     }
+
+    // Не показываем виджет если нет данных (только для режима роутеров)
+    if (total == 0) return const SizedBox.shrink();
 
     return Container(
       padding: const EdgeInsets.all(12),
@@ -638,11 +683,12 @@ class MainScanPageState extends State<MainScanPage> {
               previous.completedTT != current.completedTT ||
               previous.unsentTT != current.unsentTT ||
               previous.isTotalDay != current.isTotalDay ||
+              previous.hasUnsentSessions != current.hasUnsentSessions ||
               previous.dayHystorySession.listSessions.length !=
                   current.dayHystorySession.listSessions.length;
 
           Logger.i(
-              'buildWhen: totalTT ${previous.totalTT} -> ${current.totalTT}, completedTT ${previous.completedTT} -> ${current.completedTT}, shouldUpdate = $shouldUpdate');
+              'buildWhen: totalTT ${previous.totalTT} -> ${current.totalTT}, completedTT ${previous.completedTT} -> ${current.completedTT}, hasUnsentSessions ${previous.hasUnsentSessions} -> ${current.hasUnsentSessions}, shouldUpdate = $shouldUpdate');
 
           if (shouldUpdate) {
             Logger.i(
@@ -692,7 +738,7 @@ class MainScanPageState extends State<MainScanPage> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      if (state.shouldShowDaySelection)
+                      if (state.shouldShowDaySelection && !state.isFree)
                         UniversalDropdown<WeekDay>(
                           items: WeekDay.values,
                           value: selectedDay,
@@ -712,7 +758,7 @@ class MainScanPageState extends State<MainScanPage> {
                   left: 20,
                   child: Column(
                     children: [
-                      if (state.isRouters && state.todayRouters.isNotEmpty) ...[
+                      if (!state.isFree && state.todayRouters.isNotEmpty) ...[
                         // РЕЖИМ РОУТЕРОВ - кнопка "Начать работу" или "Дальше"
                         ButtonWide(
                           text: state.dayHystorySession.listSessions.isNotEmpty
@@ -721,7 +767,7 @@ class MainScanPageState extends State<MainScanPage> {
                           iconPath: 'assets/svg/reader.svg',
                           onPressed: () {
                             Logger.i(
-                                'ПОКАЗЫВАЕМ КНОПКУ РОУТЕРОВ: isRouters=${state.isRouters}, todayRouters.length=${state.todayRouters.length}, completedSessions=${state.dayHystorySession.listSessions.length}');
+                                'ПОКАЗЫВАЕМ КНОПКУ РОУТЕРОВ: isFree=${state.isFree}, todayRouters.length=${state.todayRouters.length}, completedSessions=${state.dayHystorySession.listSessions.length}');
                             Logger.i(
                                 'Кнопка "${state.dayHystorySession.listSessions.isNotEmpty ? 'Дальше' : 'Начать работу'}" нажата');
                             Logger.i(
@@ -734,7 +780,7 @@ class MainScanPageState extends State<MainScanPage> {
                             startSession();
                           },
                         ),
-                      ] else if (!state.isRouters) ...[
+                      ] else if (state.isFree) ...[
                         // СВОБОДНЫЙ РЕЖИМ - кнопка "Дальше"
                         ButtonWide(
                           text: 'Дальше',
