@@ -210,6 +210,10 @@ class UserRepository {
           'FTP загрузка не удалась, но данные сохранены локально: $answer');
     }
 
+    Logger.i(
+        'closeSession: после закрытия lastDay.listSessions.length = ${lastDay.listSessions.length}');
+    Logger.i(
+        'closeSession: после закрытия hystorySessions.last.listSessions.length = ${hystorySessions.last.listSessions.length}');
     Logger.i('${lastDay.listSessions.last.toJson()}');
     saveHystorySessionsToLocal();
 
@@ -228,7 +232,8 @@ class UserRepository {
     // Пытаемся повторно отправить все неотправленные сессии
     await _retryFailedUploads();
 
-    hystorySessions.add(HystorySessions.init());
+    // НЕ создаем новый день здесь - это должно происходить только в конце дня
+    // hystorySessions.add(HystorySessions.init());
     saveHystorySessionsToLocal();
     await Future.delayed(const Duration(seconds: 1));
     return '';
@@ -346,14 +351,9 @@ class UserRepository {
   /// Добавление сессии
   String addHystorySessions({
     required String id,
+    required String sessionId,
     required Position position,
   }) {
-    // Генерируем уникальный ID для сессии на основе ID торговой точки
-    // В свободном режиме используем только название ТТ, в обычном - добавляем timestamp
-    String sessionId = id.isNotEmpty
-        ? '${id}_${DateTime.now().millisecondsSinceEpoch}'
-        : 'free_${DateTime.now().millisecondsSinceEpoch}';
-
     final result =
         lastDay.listSessions.firstWhereOrNull((e) => e.id == sessionId);
     Logger.i(
@@ -365,9 +365,16 @@ class UserRepository {
       tempSession.id = sessionId; // Используем уникальный ID сессии
       tempSession.position = position;
       tempSession.time = DateTime.now();
+      Logger.i(
+          'addHystorySessions: ДО добавления lastDay.listSessions.length = ${lastDay.listSessions.length}');
+      Logger.i(
+          'addHystorySessions: ДО добавления hystorySessions.last.listSessions.length = ${hystorySessions.last.listSessions.length}');
       lastDay.addSession(tempSession);
       lastDay.state = StateSession.open;
-      hystorySessions.last.listSessions.last.state = StateSession.open;
+      Logger.i(
+          'addHystorySessions: после добавления lastDay.listSessions.length = ${lastDay.listSessions.length}');
+      Logger.i(
+          'addHystorySessions: после добавления hystorySessions.last.listSessions.length = ${hystorySessions.last.listSessions.length}');
       saveHystorySessionsToLocal();
     }
     return '';
@@ -403,9 +410,8 @@ class UserRepository {
     bool dataLoaded = await Get.find<RoutersRepository>().init();
 
     if (!dataLoaded) {
-      // Данные не загружены - но продолжаем работу в свободном режиме
-      Logger.w('Данные не загружены, но продолжаем работу в свободном режиме');
-      // Не показываем ошибку, просто продолжаем
+      // Данные не загружены - НЕ переходим дальше
+      return false;
     }
 
     // Только после успешной загрузки данных проверяем первый заход

@@ -20,6 +20,12 @@ class MainState extends Equatable {
   final bool isFreeMode;
   final bool isRouters;
 
+  // Новые поля для простого подсчета
+  final int totalTT; // Общее количество ТТ на день
+  final int completedTT; // Обработанные ТТ
+  final int unsentTT; // Неотправленные ТТ
+  final bool isTotalDay; // Все ТТ обработаны
+
   const MainState({
     required this.isLoading,
     required this.error,
@@ -39,6 +45,10 @@ class MainState extends Equatable {
     required this.isFirstLogin,
     required this.isFreeMode,
     required this.isRouters,
+    required this.totalTT,
+    required this.completedTT,
+    required this.unsentTT,
+    required this.isTotalDay,
   });
 
   MainState copyWith({
@@ -60,6 +70,10 @@ class MainState extends Equatable {
     bool? isFirstLogin,
     bool? isFreeMode,
     bool? isRouters,
+    int? totalTT,
+    int? completedTT,
+    int? unsentTT,
+    bool? isTotalDay,
   }) {
     return MainState(
       isLoading: isLoading ?? this.isLoading,
@@ -81,6 +95,10 @@ class MainState extends Equatable {
       isFirstLogin: isFirstLogin ?? this.isFirstLogin,
       isFreeMode: isFreeMode ?? this.isFreeMode,
       isRouters: isRouters ?? this.isRouters,
+      totalTT: totalTT ?? this.totalTT,
+      completedTT: completedTT ?? this.completedTT,
+      unsentTT: unsentTT ?? this.unsentTT,
+      isTotalDay: isTotalDay ?? this.isTotalDay,
     );
   }
 
@@ -115,7 +133,17 @@ class MainState extends Equatable {
         shouldShowDaySelection: false,
         isFirstLogin: false,
         isFreeMode: false,
-        isRouters: false,
+        isRouters: Get.find<RoutersRepository>().isRouters,
+        totalTT: Get.find<RoutersRepository>().todayRouters.length,
+        completedTT: Get.find<UserRepository>().hystorySessions.isNotEmpty
+            ? Get.find<UserRepository>()
+                .hystorySessions
+                .last
+                .listSessions
+                .length
+            : 0,
+        unsentTT: 0, // Будет рассчитано в _onLoadRoutersEvent
+        isTotalDay: false, // Будет рассчитано в _onLoadRoutersEvent
       );
 
   @override
@@ -136,5 +164,9 @@ class MainState extends Equatable {
         isFirstLogin,
         isFreeMode,
         isRouters,
+        totalTT,
+        completedTT,
+        unsentTT,
+        isTotalDay,
       ];
 }

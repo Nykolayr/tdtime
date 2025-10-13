@@ -53,11 +53,16 @@ class SelectDayEvent extends MainEvent {
 /// начало сессии
 class BeginSessinonEvent extends MainEvent {
   final String id;
+  final String sessionId;
   final Position position;
   const BeginSessinonEvent({
     required this.id,
+    required this.sessionId,
     required this.position,
   });
+
+  @override
+  List<Object> get props => [id, sessionId, position];
 }
 
 /// добавление dataMatrix

@@ -126,12 +126,48 @@ class MainBloc extends Bloc<MainEvent, MainState> {
   Future<void> _onLoadRoutersEvent(
       LoadRoutersEvent event, Emitter<MainState> emit) async {
     RoutersRepository repo = Get.find<RoutersRepository>();
+    UserRepository userRepo = Get.find<UserRepository>();
+
+    Logger.i(
+        '_onLoadRoutersEvent: repo.todayRouters.length = ${repo.todayRouters.length}');
+    Logger.i(
+        '_onLoadRoutersEvent: userRepo.hystorySessions.length = ${userRepo.hystorySessions.length}');
+
+    // Устанавливаем totalTT при загрузке маршрутов
+    int totalTT = repo.todayRouters.length;
+
+    // Рассчитываем completedTT из существующих сессий
+    int completedTT = userRepo.hystorySessions.isNotEmpty
+        ? userRepo.hystorySessions.last.listSessions.length
+        : 0;
+
+    // Рассчитываем unsentTT (сессии которые не отправились)
+    int unsentTT = 0;
+    if (userRepo.hystorySessions.isNotEmpty) {
+      for (var session in userRepo.hystorySessions.last.listSessions) {
+        if (!session.isUploaded) {
+          unsentTT++;
+        }
+      }
+    }
+
+    // Проверяем, все ли ТТ обработаны
+    bool isTotalDay = completedTT >= totalTT;
+
+    Logger.i(
+        '_onLoadRoutersEvent: totalTT = $totalTT, completedTT = $completedTT, unsentTT = $unsentTT, isTotalDay = $isTotalDay');
+
     emit(state.copyWith(
       marketCenters: repo.marketCenters,
       todayRouters: repo.todayRouters,
       selectedMarketCenter: repo.todayRouters.isNotEmpty
           ? repo.todayRouters.first
           : MarketCenter.init(),
+      totalTT: totalTT,
+      completedTT: completedTT,
+      unsentTT: unsentTT,
+      isTotalDay: isTotalDay,
+      isRouters: true,
     ));
   }
 
@@ -217,8 +253,8 @@ class MainBloc extends Bloc<MainEvent, MainState> {
       BeginSessinonEvent event, Emitter<MainState> emit) async {
     UserRepository repoUser = Get.find<UserRepository>();
     RoutersRepository repoRouters = Get.find<RoutersRepository>();
-    String answer =
-        repoUser.addHystorySessions(id: event.id, position: event.position);
+    String answer = repoUser.addHystorySessions(
+        id: event.id, sessionId: event.sessionId, position: event.position);
     if (answer.isNotEmpty) {
       // Показываем ошибку FTP только в режиме маршрутов, не в свободном режиме
       if (state.isRouters) {
@@ -227,27 +263,13 @@ class MainBloc extends Bloc<MainEvent, MainState> {
         emit(state.copyWith(error: ''));
       }
     } else {
-      MarketCenter marketCenter = MarketCenter.init();
-      if (repoRouters.todayRouters.isNotEmpty) {
-        repoRouters.removeMarketCenter(state.selectedMarketCenter);
-        marketCenter = repoRouters.todayRouters.first;
-      }
-
-      // Обновляем прогресс дня после начала сессии
-      Map<String, dynamic> progress = repoRouters.getDayProgress();
-
-      // Обновляем состояние неотправленных сессий
-      Map<String, dynamic> unsentSessions = repoUser.getAllUnsentSessions();
+      // Убираем выбранную ТЦ из списка
+      repoRouters.removeMarketCenter(state.selectedMarketCenter);
 
       emit(state.copyWith(
-        dayHystorySession: repoUser.lastDay,
-        curSession: repoUser.lastDay.listSessions.last,
         todayRouters: repoRouters.todayRouters,
-        selectedMarketCenter: marketCenter,
-        dayProgress: progress,
-        unsentSessions:
-            unsentSessions['unsentByDay'] as Map<String, List<SessionScan>>,
-        hasUnsentSessions: unsentSessions['hasUnsent'] as bool,
+        curSession: repoUser.lastDay.listSessions.last,
+        shouldShowDaySelection: false, // Скрываем выбор дня после начала сессии
       ));
     }
   }
@@ -307,50 +329,43 @@ class MainBloc extends Bloc<MainEvent, MainState> {
   /// закрытие сессии
   Future<void> _onCloseSessionEvent(
       CloseSessionEvent event, Emitter<MainState> emit) async {
-    emit(state.copyWith(isLoading: true));
+    // Сессия уже закрыта в UserRepository, теперь обрабатываем ее окончательно
     UserRepository repo = Get.find<UserRepository>();
+    RoutersRepository routersRepo = Get.find<RoutersRepository>();
 
-    String answer = await repo.closeSession();
-    emit(state.copyWith(isLoading: false));
-    if (answer.isNotEmpty) {
-      emit(state.copyWith(error: answer));
-      await Future.delayed(const Duration(seconds: 5));
-      emit(state.copyWith(error: ''));
-    } else {
-      // Обновляем прогресс дня после закрытия сессии
-      RoutersRepository routersRepo = Get.find<RoutersRepository>();
-
-      // Удаляем обработанную торговую точку из списка (только в обычном режиме)
-      if (state.selectedMarketCenter.id.isNotEmpty && !state.isFreeMode) {
-        routersRepo.removeMarketCenter(state.selectedMarketCenter);
-      }
-
-      Map<String, dynamic> progress = routersRepo.getDayProgress();
-      Logger.i('_onCloseSessionEvent: progress = $progress');
-
-      // Обновляем состояние неотправленных сессий
-      Map<String, dynamic> unsentSessions = repo.getAllUnsentSessions();
-
-      Logger.i(
-          '_onCloseSessionEvent: обновляем состояние - dayHystorySession.listSessions.length = ${repo.lastDay.listSessions.length}');
-      Logger.i(
-          '_onCloseSessionEvent: обновляем состояние - progress = $progress');
-      Logger.i(
-          '_onCloseSessionEvent: обновляем состояние - hasUnsentSessions = ${unsentSessions['hasUnsent']}');
-      Logger.i(
-          '_onCloseSessionEvent: обновляем состояние - unsentSessions = ${unsentSessions['unsentByDay']}');
-
-      emit(state.copyWith(
-        dayHystorySession: repo.lastDay,
-        curSession: repo.lastDay.listSessions.last,
-        todayRouters: routersRepo.todayRouters,
-        dayProgress: progress,
-        unsentSessions:
-            unsentSessions['unsentByDay'] as Map<String, List<SessionScan>>,
-        hasUnsentSessions: unsentSessions['hasUnsent'] as bool,
-        isRouters: routersRepo.isRouters,
-      ));
+    // Удаляем обработанную торговую точку из списка (только в обычном режиме)
+    if (state.selectedMarketCenter.id.isNotEmpty && !state.isFreeMode) {
+      routersRepo.removeMarketCenter(state.selectedMarketCenter);
     }
+
+    // Увеличиваем счетчики
+    int newCompletedTT = state.completedTT + 1;
+
+    // Проверяем, отправилась ли последняя сессия
+    bool isLastSessionUploaded = repo.lastDay.listSessions.last.isUploaded;
+    int newUnsentTT = state.unsentTT + (isLastSessionUploaded ? 0 : 1);
+
+    // Проверяем, все ли ТТ обработаны
+    bool isTotalDay = newCompletedTT >= state.totalTT;
+
+    Logger.i(
+        '_onCloseSessionEvent: completedTT = $newCompletedTT, unsentTT = $newUnsentTT, isTotalDay = $isTotalDay');
+    Logger.i(
+        '_onCloseSessionEvent: repo.lastDay.listSessions.length = ${repo.lastDay.listSessions.length}');
+    Logger.i(
+        '_onCloseSessionEvent: state.dayHystorySession.listSessions.length = ${state.dayHystorySession.listSessions.length}');
+
+    emit(state.copyWith(
+      dayHystorySession: repo.lastDay,
+      curSession: repo.lastDay.listSessions.last,
+      todayRouters: routersRepo.todayRouters,
+      completedTT: newCompletedTT,
+      unsentTT: newUnsentTT,
+      isTotalDay: isTotalDay,
+      shouldShowDaySelection: false, // Скрываем выбор дня после первой ТТ
+      // Если все ТТ завершены, показываем сообщение о завершении
+      error: isTotalDay ? 'Все торговые точки обработаны!' : '',
+    ));
   }
 
   /// принудительная отправка всех сессий

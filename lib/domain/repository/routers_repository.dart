@@ -112,7 +112,12 @@ class RoutersRepository {
 
     // Восстанавливаем незавершенный день, если есть
     await restoreUnfinishedDay();
-    return true;
+
+    // Возвращаем true только если файл загрузился (есть данные)
+    bool hasData = marketCenters.isNotEmpty || weekRouters.isNotEmpty;
+    Logger.i(
+        'init() завершен: hasData = $hasData, marketCenters.length = ${marketCenters.length}, weekRouters.length = ${weekRouters.length}');
+    return hasData;
   }
 
   /// убираем выбранный ТЦ из списка точек на сегодня
@@ -169,16 +174,15 @@ class RoutersRepository {
   /// Получение прогресса дня
   Map<String, dynamic> getDayProgress() {
     final user = Get.find<UserRepository>();
-    List<SessionScan> closedSessions = user.lastDay.listSessions
-        .where((session) => session.state == StateSession.close)
-        .toList();
-
-    int completed = closedSessions.length;
+    // Считаем количество обработанных ТТ (уникальные ID ТТ)
+    Set<String> processedTTs =
+        user.lastDay.listSessions.map((session) => session.id).toSet();
+    int completed = processedTTs.length;
 
     Logger.i('getDayProgress: weekRouters.isEmpty = ${weekRouters.isEmpty}');
     Logger.i(
         'getDayProgress: total sessions = ${user.lastDay.listSessions.length}');
-    Logger.i('getDayProgress: closed sessions = $completed');
+    Logger.i('getDayProgress: completed sessions = $completed');
 
     // СВОБОДНЫЙ РЕЖИМ - просто количество обработанных точек
     if (!isRouters) {
@@ -192,12 +196,13 @@ class RoutersRepository {
       };
     }
 
-    // Получаем полный список торговых точек для сегодняшнего дня
+    // В режиме роутеров считаем правильно
+    // Получаем полный список торговых точек на сегодня (фиксированное количество)
     List<MarketCenter> fullDayRouters =
         getMarketCentersForDay(day: getCurrentDay());
-
-    int total = fullDayRouters.length;
-    int remaining = todayRouters.length;
+    int total =
+        fullDayRouters.length; // Общее количество ТТ на день (не меняется)
+    int remaining = total - completed; // Осталось = общее - обработанные
 
     return {
       'total': total,
@@ -265,19 +270,10 @@ class RoutersRepository {
         errorMessage = ttData['error'];
         return;
       }
-      // ВРЕМЕННАЯ ЗАГЛУШКА ДЛЯ ТЕСТИРОВАНИЯ СВОБОДНОГО РЕЖИМА
       // Загружаем маршруты
       Logger.i('Загружаем ${user.filePath}...');
       final routersData = await Api().downloadJsonFile(user.filePath);
       if (routersData['error'] == null) {
-        // ВРЕМЕННО: Создаем пустой список маршрутов для тестирования свободного режима
-        weekRouters = [];
-        Logger.i(
-            'ТЕСТ: Создан пустой список маршрутов для проверки свободного режима');
-        isFileExist = true;
-
-        // Закомментированный оригинальный код:
-        /*
         weekRouters = (routersData['routers'] as List).map((r) {
           final ids = (r['marketCenterIds'] as List)
               .map((id) => id.toString())
@@ -293,7 +289,6 @@ class RoutersRepository {
           );
         }).toList();
         Logger.i('Загружено маршрутов: ${weekRouters.length}');
-        */
       } else {
         Logger.e('Ошибка загрузки ${user.filePath}: ${routersData['error']}');
         isFileExist = false;

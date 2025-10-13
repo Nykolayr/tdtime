@@ -5,6 +5,7 @@ import 'package:gap/gap.dart';
 import 'package:get/get.dart';
 import 'package:go_router/go_router.dart';
 import 'package:qr_code_scanner/qr_code_scanner.dart';
+import 'package:tdtime/domain/repository/user_repository.dart';
 import 'package:tdtime/presentation/screens/main/bloc/main_bloc.dart';
 import 'package:tdtime/presentation/screens/main/widget.dart';
 import 'package:tdtime/presentation/screens/scan/qr_code_scan.dart';
@@ -22,6 +23,7 @@ class DataMatrixScanPageState extends State<DataMatrixScanPage> {
   final GlobalKey qrKey = GlobalKey(debugLabel: 'QR');
   MainBloc bloc = Get.find<MainBloc>();
   QRViewController? controller;
+  bool _isClosingSession = false;
   String error = '';
   bool isLoading = false;
   late Barcode result;
@@ -34,6 +36,38 @@ class DataMatrixScanPageState extends State<DataMatrixScanPage> {
   void dispose() {
     controller?.dispose();
     super.dispose();
+  }
+
+  /// Закрытие сессии с лоадером
+  void _closeSession() {
+    _closeSessionAsync();
+  }
+
+  /// Асинхронное закрытие сессии
+  void _closeSessionAsync() async {
+    setState(() {
+      _isClosingSession = true;
+    });
+
+    try {
+      // Сначала закрываем сессию в UserRepository
+      UserRepository userRepo = Get.find<UserRepository>();
+      await userRepo.closeSession();
+
+      // Потом обновляем состояние в MainBloc
+      bloc.add(CloseSessionEvent());
+
+      await Future.delayed(const Duration(milliseconds: 100));
+      if (context.mounted) {
+        GoRouter.of(context).pop();
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isClosingSession = false;
+        });
+      }
+    }
   }
 
   /// начало сканирования дата матрикс
@@ -98,7 +132,7 @@ class DataMatrixScanPageState extends State<DataMatrixScanPage> {
             return Scaffold(
               extendBodyBehindAppBar: true,
               appBar: AppBars(
-                title: 'ТТ ${state.curSession.id.split('_')[0]}',
+                title: 'ТТ ${state.curSession.id}',
                 isBack: false,
                 isLeft: true,
               ),
@@ -137,16 +171,12 @@ class DataMatrixScanPageState extends State<DataMatrixScanPage> {
                         ),
                         const Gap(20),
                         ButtonWide(
-                            text: 'Закончить сканирование в ТТ',
-                            iconPath: 'assets/svg/exit.svg',
-                            onPressed: () async {
-                              bloc.add(CloseSessionEvent());
-                              await Future.delayed(
-                                  const Duration(milliseconds: 100));
-                              if (context.mounted) {
-                                GoRouter.of(context).pop();
-                              }
-                            }),
+                          text: _isClosingSession
+                              ? 'Отправка данных...'
+                              : 'Закончить сканирование в ТТ',
+                          iconPath: 'assets/svg/exit.svg',
+                          onPressed: _isClosingSession ? () {} : _closeSession,
+                        ),
                         const Gap(20),
                         ButtonWide(
                           text: 'Отменить сканирование ТТ',

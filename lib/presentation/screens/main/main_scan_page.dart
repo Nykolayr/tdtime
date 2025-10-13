@@ -37,6 +37,7 @@ class MainScanPageState extends State<MainScanPage> {
   bool isLoading = false;
   late Barcode result;
   WeekDay selectedDay = WeekDay.values[DateTime.now().weekday - 1];
+  late GoRouter _router;
 
   @override
   void initState() {
@@ -58,12 +59,13 @@ class MainScanPageState extends State<MainScanPage> {
     });
 
     // Слушаем изменения роутера для автоматического закрытия сессии в свободном режиме
-    GoRouter.of(context).routerDelegate.addListener(_onRouteChanged);
+    _router = GoRouter.of(context);
+    _router.routerDelegate.addListener(_onRouteChanged);
   }
 
   @override
   void dispose() {
-    GoRouter.of(context).routerDelegate.removeListener(_onRouteChanged);
+    _router.routerDelegate.removeListener(_onRouteChanged);
     controller?.dispose();
     super.dispose();
   }
@@ -84,10 +86,20 @@ class MainScanPageState extends State<MainScanPage> {
 
     if (mounted) {
       final routersRepo = Get.find<RoutersRepository>();
+      final state = bloc.state;
 
-      // Если нет маршрутов вообще, включаем свободный режим
+      // Если есть ошибка загрузки, не переходим дальше - остаемся на авторизации
+      if (state.error.isNotEmpty || state.errorShowMessage.isNotEmpty) {
+        return;
+      }
+
+      // Если файл не загрузился (нет данных), не переходим дальше
+      if (!routersRepo.isFileExist) {
+        return;
+      }
+
+      // Если нет маршрутов, но файл загрузился - включаем свободный режим
       if (routersRepo.weekRouters.isEmpty) {
-        Logger.i('Включаем свободный режим: weekRouters пустой');
         bloc.add(const SetFreeModeEvent(isFreeMode: true));
         await showFreeModeDialog();
       }
@@ -339,6 +351,9 @@ class MainScanPageState extends State<MainScanPage> {
         ? bloc.state.selectedMarketCenter.id
         : (ttName ?? bloc.state.selectedMarketCenter.name);
 
+    // Генерируем уникальный sessionId для каждой сессии
+    String sessionId = '${ttId}_${DateTime.now().millisecondsSinceEpoch}';
+
     Logger.i('startSession: isRouters = ${bloc.state.isRouters}');
     Logger.i(
         'startSession: selectedMarketCenter.id = ${bloc.state.selectedMarketCenter.id}');
@@ -346,8 +361,10 @@ class MainScanPageState extends State<MainScanPage> {
         'startSession: selectedMarketCenter.name = ${bloc.state.selectedMarketCenter.name}');
     Logger.i('startSession: ttName = $ttName');
     Logger.i('startSession: ttId = $ttId');
+    Logger.i('startSession: sessionId = $sessionId');
 
-    bloc.add(BeginSessinonEvent(id: ttId, position: position));
+    bloc.add(
+        BeginSessinonEvent(id: ttId, sessionId: sessionId, position: position));
 
     isLoading = false;
     setState(() {});
@@ -423,23 +440,19 @@ class MainScanPageState extends State<MainScanPage> {
 
   /// Виджет прогресса дня
   Widget _buildDayProgressWidget(MainState state) {
-    if (state.dayProgress.isEmpty) return const SizedBox.shrink();
+    // Используем новые поля вместо старого dayProgress
+    int total = state.totalTT;
+    int completed = state.completedTT;
+    int unsent = state.unsentTT;
+    bool isTotalDay = state.isTotalDay;
 
-    int total = state.dayProgress['total'] as int? ?? 0;
-    int completed = state.dayProgress['completed'] as int? ?? 0;
-    int remaining = state.dayProgress['remaining'] as int? ?? 0;
-    bool isCompleted = state.dayProgress['isCompleted'] as bool? ?? false;
-    double progress = state.dayProgress['progress'] as double? ?? 0.0;
-
-    // СВОБОДНЫЙ РЕЖИМ - упрощенный виджет без прогресс-бара
-    if (!state.isRouters) {
-      // В свободном режиме берем длину списка посещений вместо completed
-      int actualCompleted = state.dayHystorySession.listSessions.length;
-      return _buildFreeModeProgressWidget(state, actualCompleted);
-    }
-
-    // Проверяем, это свободный график (нет данных о днях недели)
+    // Не показываем виджет если нет данных
     if (total == 0) return const SizedBox.shrink();
+
+    // СВОБОДНЫЙ РЕЖИМ - упрощенный виджет
+    if (!state.isRouters) {
+      return _buildFreeModeProgressWidget(state, completed);
+    }
 
     return Container(
       padding: const EdgeInsets.all(12),
@@ -454,13 +467,13 @@ class MainScanPageState extends State<MainScanPage> {
           Row(
             children: [
               Icon(
-                isCompleted ? Icons.check_circle : Icons.schedule,
-                color: isCompleted ? AppColor.green : AppColor.yellow,
+                isTotalDay ? Icons.check_circle : Icons.schedule,
+                color: isTotalDay ? AppColor.green : AppColor.yellow,
                 size: 16,
               ),
               const Gap(8),
               Text(
-                isCompleted ? 'День завершен' : 'Прогресс дня',
+                isTotalDay ? 'День завершен' : 'Прогресс дня',
                 style: AppText.medium12.copyWith(color: AppColor.white),
               ),
             ],
@@ -470,24 +483,28 @@ class MainScanPageState extends State<MainScanPage> {
             'Обработано: $completed из $total торговых точек',
             style: AppText.text12.copyWith(color: AppColor.white),
           ),
-          if (remaining > 0) ...[
+          if (completed < total) ...[
             const Gap(4),
             Text(
-              'Осталось: $remaining',
+              'Осталось: ${total - completed}',
               style: AppText.text12.copyWith(color: AppColor.yellow),
+            ),
+          ],
+          if (unsent > 0) ...[
+            const Gap(4),
+            Text(
+              'Неотправлено: $unsent',
+              style: AppText.text12.copyWith(color: Colors.red),
             ),
           ],
           const Gap(8),
           LinearProgressIndicator(
-            value: progress,
+            value: total > 0 ? completed / total : 0.0,
             backgroundColor: AppColor.grey,
             valueColor: AlwaysStoppedAnimation<Color>(
-              isCompleted ? AppColor.green : AppColor.blue,
+              isTotalDay ? AppColor.green : AppColor.blue,
             ),
           ),
-          const Gap(8),
-          // Счетчик неотправленных сессий
-          _buildUnsentCounter(state),
           const Gap(12),
           // Кнопка просмотра истории
           SizedBox(
@@ -616,16 +633,26 @@ class MainScanPageState extends State<MainScanPage> {
     return BlocBuilder<MainBloc, MainState>(
         bloc: bloc,
         buildWhen: (previous, current) {
-          // Обновляем UI при изменении прогресса дня или неотправленных сессий
-          bool shouldUpdate = previous.dayProgress != current.dayProgress ||
-              previous.hasUnsentSessions != current.hasUnsentSessions ||
-              previous.dayHystorySession != current.dayHystorySession;
+          // Обновляем UI при изменении новых полей прогресса
+          bool shouldUpdate = previous.totalTT != current.totalTT ||
+              previous.completedTT != current.completedTT ||
+              previous.unsentTT != current.unsentTT ||
+              previous.isTotalDay != current.isTotalDay ||
+              previous.dayHystorySession.listSessions.length !=
+                  current.dayHystorySession.listSessions.length;
+
+          Logger.i(
+              'buildWhen: totalTT ${previous.totalTT} -> ${current.totalTT}, completedTT ${previous.completedTT} -> ${current.completedTT}, shouldUpdate = $shouldUpdate');
 
           if (shouldUpdate) {
             Logger.i(
-                'buildWhen: обновляем UI - dayProgress: ${previous.dayProgress} -> ${current.dayProgress}');
+                'buildWhen: обновляем UI - totalTT: ${previous.totalTT} -> ${current.totalTT}');
             Logger.i(
-                'buildWhen: обновляем UI - hasUnsentSessions: ${previous.hasUnsentSessions} -> ${current.hasUnsentSessions}');
+                'buildWhen: обновляем UI - completedTT: ${previous.completedTT} -> ${current.completedTT}');
+            Logger.i(
+                'buildWhen: обновляем UI - unsentTT: ${previous.unsentTT} -> ${current.unsentTT}');
+            Logger.i(
+                'buildWhen: обновляем UI - isTotalDay: ${previous.isTotalDay} -> ${current.isTotalDay}');
             Logger.i(
                 'buildWhen: обновляем UI - dayHystorySession.length: ${previous.dayHystorySession.listSessions.length} -> ${current.dayHystorySession.listSessions.length}');
           }
@@ -636,9 +663,7 @@ class MainScanPageState extends State<MainScanPage> {
           return Scaffold(
             extendBodyBehindAppBar: true,
             appBar: AppBars(
-              title: state.dayHystorySession.listSessions.isEmpty
-                  ? 'Сканирование'
-                  : 'История посещений ТТ',
+              title: 'Сканирование',
               isBack: false,
               isLeft: true,
             ),
@@ -687,27 +712,26 @@ class MainScanPageState extends State<MainScanPage> {
                   left: 20,
                   child: Column(
                     children: [
-                      if (state.shouldShowDaySelection) ...[
-                        // Показываем статус только если есть выполненные сессии
-                        if (state
-                            .dayHystorySession.listSessions.isNotEmpty) ...[
-                          Text(
-                            'На сегодняшний день, маршрут выполнен',
-                            style: AppText.medium14.copyWith(
-                              color: AppColor.white,
-                            ),
-                          ),
-                          const Gap(8),
-                          _buildUploadStatusWidget(state),
-                        ],
-                      ],
-                      if (state.shouldShowDaySelection) ...[
-                        // Всегда показываем кнопку для выбора дня (свободный график)
+                      if (state.isRouters && state.todayRouters.isNotEmpty) ...[
+                        // РЕЖИМ РОУТЕРОВ - кнопка "Начать работу" или "Дальше"
                         ButtonWide(
-                          text: 'Начать работу',
+                          text: state.dayHystorySession.listSessions.isNotEmpty
+                              ? 'Дальше'
+                              : 'Начать работу',
                           iconPath: 'assets/svg/reader.svg',
                           onPressed: () {
-                            bloc.add(SelectDayEvent(day: selectedDay));
+                            Logger.i(
+                                'ПОКАЗЫВАЕМ КНОПКУ РОУТЕРОВ: isRouters=${state.isRouters}, todayRouters.length=${state.todayRouters.length}, completedSessions=${state.dayHystorySession.listSessions.length}');
+                            Logger.i(
+                                'Кнопка "${state.dayHystorySession.listSessions.isNotEmpty ? 'Дальше' : 'Начать работу'}" нажата');
+                            Logger.i(
+                                'todayRouters.length = ${state.todayRouters.length}');
+                            // Выбираем первую ТЦ из маршрута и начинаем сессию
+                            final firstTT = state.todayRouters.first;
+                            Logger.i('Выбираем первую ТЦ: ${firstTT.name}');
+                            bloc.add(
+                                SelectMarketCenterEvent(marketCenter: firstTT));
+                            startSession();
                           },
                         ),
                       ] else if (!state.isRouters) ...[
@@ -724,7 +748,13 @@ class MainScanPageState extends State<MainScanPage> {
                           text: 'Дальше',
                           iconPath: 'assets/svg/reader.svg',
                           onPressed: () {
-                            startSession();
+                            // В обычном режиме выбираем первую ТЦ из маршрута
+                            if (state.todayRouters.isNotEmpty) {
+                              final firstTT = state.todayRouters.first;
+                              bloc.add(SelectMarketCenterEvent(
+                                  marketCenter: firstTT));
+                              startSession();
+                            }
                           },
                         ),
                       ],
