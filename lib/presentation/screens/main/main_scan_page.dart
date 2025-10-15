@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:flutter_easylogger/flutter_logger.dart';
 import 'package:gap/gap.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:get/get.dart';
@@ -88,33 +87,17 @@ class MainScanPageState extends State<MainScanPage> {
         const Duration(milliseconds: 1000)); // Увеличиваем задержку
 
     if (mounted) {
-      final routersRepo = Get.find<RoutersRepository>();
       final state = bloc.state;
-
-      Logger.i('_checkFreeMode: isFree = ${state.isFree}');
-      Logger.i(
-          '_checkFreeMode: weekRouters.length = ${routersRepo.weekRouters.length}');
-      Logger.i('_checkFreeMode: isFileExist = ${routersRepo.isFileExist}');
 
       // Если есть ошибка загрузки, не переходим дальше - остаемся на авторизации
       if (state.error.isNotEmpty || state.errorShowMessage.isNotEmpty) {
-        Logger.i('_checkFreeMode: есть ошибка, выходим');
         return;
       }
 
-      // Убираем проверку isFileExist, так как данные уже загружены
-      // if (!routersRepo.isFileExist) {
-      //   Logger.i('_checkFreeMode: файл не загружен, выходим');
-      //   return;
-      // }
-
       // Если нет маршрутов, но файл загрузился - включаем свободный режим
       if (state.isFree) {
-        Logger.i('_checkFreeMode: isFree = true, показываем попап');
         bloc.add(const SetFreeModeEvent(isFreeMode: true));
         await showFreeModeDialog();
-      } else {
-        Logger.i('_checkFreeMode: isFree = false, попап не показываем');
       }
     }
   }
@@ -162,13 +145,10 @@ class MainScanPageState extends State<MainScanPage> {
 
       // Если есть неотправленные сессии (даже если день закрыт), переходим на страницу истории
       if (hasUnsentSessions) {
-        Logger.i(
-            'Обнаружены неотправленные сессии, переходим на страницу истории');
         context.go('/main/history');
       }
       // Если день завершен и все отправлено, переходим к новому дню
       else if (isDayCompleted && !hasUnsentSessions) {
-        Logger.i('День завершен и все отправлено, начинаем новый день');
         bloc.add(StartNewDayEvent());
       }
     }
@@ -177,21 +157,14 @@ class MainScanPageState extends State<MainScanPage> {
   void checkError() async {
     // Проверяем, есть ли данные о маршрутах - если есть, то ошибки нет
     final routersRepo = Get.find<RoutersRepository>();
-    Logger.i(
-        'checkError: weekRouters.length = ${routersRepo.weekRouters.length}');
-    Logger.i('checkError: errorMessage = "${routersRepo.errorMessage}"');
-    Logger.i('checkError: errorShowMessage = "${bloc.state.errorShowMessage}"');
 
     if (routersRepo.weekRouters.isNotEmpty) {
       // Данные загружены успешно, не показываем ошибку
-      Logger.i('checkError: Данные загружены успешно, пропускаем показ ошибки');
       return;
     }
 
     // Если включен свободный режим, не показываем ошибку о маршрутах
     if (bloc.state.isFreeMode) {
-      Logger.i(
-          'checkError: Свободный режим активен, пропускаем показ ошибки о маршрутах');
       return;
     }
 
@@ -311,16 +284,13 @@ class MainScanPageState extends State<MainScanPage> {
       final result = await context.push<Barcode>('/main/qr_scan');
 
       if (result != null && result.code != null) {
-        Logger.i('QR scan result: ${result.code}');
         // Используем отсканированный код как название ТТ
         _processTTSelection(result.code!);
       } else {
-        Logger.w('QR scan cancelled or failed');
         // Показываем диалог снова, если сканирование отменено
         _showTTSearchDialog();
       }
     } catch (e) {
-      Logger.e('Error during QR scan: $e');
       // Показываем диалог снова при ошибке
       _showTTSearchDialog();
     }
@@ -344,22 +314,17 @@ class MainScanPageState extends State<MainScanPage> {
   }
 
   void startSession({String? ttName}) async {
-    Logger.i('startSession: ВЫЗВАН с ttName=$ttName');
     // Проверяем, есть ли активная сессия
     if (bloc.state.dayHystorySession.listSessions.isNotEmpty) {
       SessionScan lastSession = bloc.state.dayHystorySession.listSessions.last;
       if (lastSession.state != StateSession.close) {
         // Есть активная сессия - переходим к сканированию DataMatrix
-        Logger.i(
-            'startSession: есть активная сессия, переходим к сканированию');
         if (mounted) {
           context.go('/main/matrix');
         }
         return;
       }
     }
-
-    // Убираем проверку на маршруты - она не нужна
 
     // Обычный режим - начинаем сессию с выбранной ТЦ
     isLoading = true;
@@ -378,7 +343,6 @@ class MainScanPageState extends State<MainScanPage> {
     try {
       position = await determinePosition().timeout(const Duration(seconds: 10));
     } catch (e) {
-      Logger.e('Ошибка при определения местоположения $e');
       // Используем координаты по умолчанию если геолокация не работает
       position = Position(
         latitude: 0.0,
@@ -404,15 +368,6 @@ class MainScanPageState extends State<MainScanPage> {
     // Генерируем уникальный sessionId для каждой сессии
     String sessionId = '${ttId}_${DateTime.now().millisecondsSinceEpoch}';
 
-    Logger.i('startSession: isFree = ${bloc.state.isFree}');
-    Logger.i(
-        'startSession: selectedMarketCenter.id = ${bloc.state.selectedMarketCenter.id}');
-    Logger.i(
-        'startSession: selectedMarketCenter.name = ${bloc.state.selectedMarketCenter.name}');
-    Logger.i('startSession: ttName = $ttName');
-    Logger.i('startSession: ttId = $ttId');
-    Logger.i('startSession: sessionId = $sessionId');
-
     // Добавляем сессию в любом режиме
     bloc.add(
         BeginSessinonEvent(id: ttId, sessionId: sessionId, position: position));
@@ -430,11 +385,6 @@ class MainScanPageState extends State<MainScanPage> {
 
   /// Виджет прогресса для свободного режима
   Widget buildFreeModeProgressWidget(MainState state, int completed) {
-    Logger.i(
-        '_buildFreeModeProgressWidget: completed = $completed, hasUnsentSessions = ${state.hasUnsentSessions}');
-    Logger.i(
-        '_buildFreeModeProgressWidget: unsentSessions = ${state.unsentSessions}');
-
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
@@ -769,6 +719,7 @@ class MainScanPageState extends State<MainScanPage> {
                           onChanged: (day) {
                             if (day != null) {
                               setState(() => selectedDay = day);
+                              bloc.add(SelectDayEvent(day: day));
                             }
                           },
                           label: 'Выберите день недели',
@@ -793,11 +744,8 @@ class MainScanPageState extends State<MainScanPage> {
                                 : 'Дальше',
                             iconPath: 'assets/svg/reader.svg',
                             onPressed: () {
-                              Logger.i(
-                                  'Кнопка "${state.dayHystorySession.listSessions.isEmpty ? 'Начать работу' : 'Дальше'}" нажата');
                               // Выбираем первую ТЦ из маршрута и начинаем сессию
                               final firstTT = state.todayRouters.first;
-                              Logger.i('Выбираем первую ТЦ: ${firstTT.name}');
                               bloc.add(SelectMarketCenterEvent(
                                   marketCenter: firstTT));
                               startSession();
@@ -888,7 +836,7 @@ class MainScanPageState extends State<MainScanPage> {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(
+          const Icon(
             Icons.check_circle,
             color: AppColor.green,
             size: 20,
@@ -910,11 +858,6 @@ class MainScanPageState extends State<MainScanPage> {
     // Используем hasUnsentSessions из state, который учитывает все неотправленные сессии
     bool hasUnsentSessions = state.hasUnsentSessions;
 
-    Logger.i('_buildCloseDayButton: hasUnsentSessions = $hasUnsentSessions');
-    Logger.i('_buildCloseDayButton: isEnable = ${!hasUnsentSessions}');
-    Logger.i(
-        '_buildCloseDayButton: onPressed = ${hasUnsentSessions ? "null" : "bloc.add(ClosedayEvent())"}');
-
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -923,11 +866,9 @@ class MainScanPageState extends State<MainScanPage> {
           iconPath: 'assets/svg/reader.svg',
           onPressed: hasUnsentSessions
               ? () {
-                  Logger.w(
-                      '_buildCloseDayButton: кнопка заблокирована из-за неотправленных сессий');
+                  // Кнопка заблокирована из-за неотправленных сессий
                 }
               : () {
-                  Logger.i('_buildCloseDayButton: нажата кнопка закрытия дня');
                   bloc.add(ClosedayEvent());
                 },
           isEnable:

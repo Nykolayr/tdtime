@@ -6,7 +6,6 @@ import 'package:tdtime/domain/models/session.dart';
 import 'package:tdtime/domain/models/hystory_sessions.dart';
 import 'package:tdtime/domain/models/week_routers.dart';
 import 'package:tdtime/domain/repository/user_repository.dart';
-import 'package:flutter_easylogger/flutter_logger.dart';
 import 'package:tdtime/data/local_data.dart';
 
 class RoutersRepository {
@@ -49,35 +48,23 @@ class RoutersRepository {
     errorMessage = '';
     isRouters = false;
 
-    // Сначала пытаемся загрузить из локального хранилища
-    bool hasLocalData = false;
+    // Сначала пытаемся загрузить с FTP (приоритет)
+    bool ftpSuccess = false;
     try {
-      await _loadFromLocal();
-      hasLocalData = marketCenters.isNotEmpty && weekRouters.isNotEmpty;
-      if (hasLocalData) {
-        Logger.i('Данные загружены из локального хранилища');
-      } else {
-        Logger.i('Локальных данных нет или они неполные');
+      await _loadFromFtp();
+      if (marketCenters.isNotEmpty && weekRouters.isNotEmpty) {
+        ftpSuccess = true;
       }
     } catch (e) {
-      Logger.e('Failed to load from local: $e');
+      // FTP недоступен, загружаем из локального хранилища
     }
 
-    // Если локальных данных нет, пытаемся загрузить с FTP
-    if (!hasLocalData) {
-      Logger.i('Нет локальных данных, пытаемся загрузить с FTP...');
+    // Если FTP не удался, загружаем из локального хранилища
+    if (!ftpSuccess) {
       try {
-        await _loadFromFtp();
-        if (marketCenters.isNotEmpty && weekRouters.isNotEmpty) {
-          Logger.i('Данные успешно загружены с FTP');
-        } else {
-          Logger.w('FTP загрузка не дала результатов');
-        }
+        await _loadFromLocal();
       } catch (e) {
-        Logger.e('Failed to load from FTP: $e');
-        // Не устанавливаем errorMessage при отсутствии интернета - работаем с локальными данными
-        Logger.w(
-            'FTP недоступен, работаем с локальными данными или в свободном режиме');
+        // Локальных данных нет
       }
     }
 
@@ -92,7 +79,6 @@ class RoutersRepository {
       if (lastOpened != null) {
         await saveLastOpenedWeekDay(today);
       }
-      Logger.i('Новый день: todayRouters обновлены из weekRouters');
     } else {
       // День тот же — todayRouters из локалки
       final saved =
@@ -102,24 +88,16 @@ class RoutersRepository {
       } else {
         todayRouters = getMarketCentersForDay(day: today);
       }
-      Logger.i('Тот же день: todayRouters из локалки');
     }
 
     // Устанавливаем флаг наличия роутеров на основе todayRouters
     isRouters = todayRouters.isNotEmpty;
-    if (isRouters) {
-      Logger.i('Режим с роутерами: todayRouters = ${todayRouters.length}');
-    } else {
-      Logger.i('Свободный режим: todayRouters пустой');
-    }
 
     // Восстанавливаем незавершенный день, если есть
     await restoreUnfinishedDay();
 
     // Возвращаем true только если файл загрузился (есть данные)
     bool hasData = marketCenters.isNotEmpty || weekRouters.isNotEmpty;
-    Logger.i(
-        'init() завершен: hasData = $hasData, marketCenters.length = ${marketCenters.length}, weekRouters.length = ${weekRouters.length}');
     return hasData;
   }
 
@@ -131,18 +109,10 @@ class RoutersRepository {
 
   /// Выбор дня
   Future<void> selectDay(WeekDay day) async {
-    Logger.i('Выбираем день: $day');
-    Logger.i('Доступные weekRouters: ${weekRouters.length}');
-    for (var route in weekRouters) {
-      Logger.i('  - ${route.day}: ${route.marketCenterIds.length} ТЦ');
-    }
-
     // Сохраняем выбранный день
     selectedDay = day;
 
     todayRouters = getMarketCentersForDay(day: day);
-    Logger.i('Получено todayRouters: ${todayRouters.length}');
-
     await _saveTodayRouters();
   }
 
@@ -166,8 +136,6 @@ class RoutersRepository {
       // Удаляем уже обработанные торговые точки
       todayRouters.removeWhere((mc) => processedIds.contains(mc.id));
 
-      Logger.i(
-          'Восстановлен маршрут: осталось ${todayRouters.length} торговых точек');
       await _saveTodayRouters();
     }
   }
@@ -180,19 +148,18 @@ class RoutersRepository {
   /// Получение прогресса дня
   Map<String, dynamic> getDayProgress() {
     final user = Get.find<UserRepository>();
-    // Считаем количество обработанных ТТ (уникальные ID ТТ)
+
+    // Получаем день для расчета прогресса
+    WeekDay dayForProgress = selectedDay ?? getCurrentDay();
+
+    // Считаем количество обработанных ТТ для текущего дня
+    // (история не разделена по дням недели, только по датам)
     Set<String> processedTTs =
         user.lastDay.listSessions.map((session) => session.id).toSet();
     int completed = processedTTs.length;
 
-    Logger.i('getDayProgress: weekRouters.isEmpty = ${weekRouters.isEmpty}');
-    Logger.i(
-        'getDayProgress: total sessions = ${user.lastDay.listSessions.length}');
-    Logger.i('getDayProgress: completed sessions = $completed');
-
     // СВОБОДНЫЙ РЕЖИМ - просто количество обработанных точек
     if (!isRouters) {
-      Logger.i('getDayProgress: Свободный режим - completed = $completed');
       return {
         'total': 0, // Не показываем "из X"
         'completed': completed,
@@ -204,17 +171,11 @@ class RoutersRepository {
 
     // В режиме роутеров считаем правильно
     // Получаем полный список торговых точек для выбранного дня (фиксированное количество)
-    WeekDay dayForProgress = selectedDay ?? getCurrentDay();
     List<MarketCenter> fullDayRouters =
         getMarketCentersForDay(day: dayForProgress);
     int total =
         fullDayRouters.length; // Общее количество ТТ на день (не меняется)
     int remaining = total - completed; // Осталось = общее - обработанные
-
-    Logger.i(
-        'getDayProgress: selectedDay = $selectedDay, dayForProgress = $dayForProgress');
-    Logger.i(
-        'getDayProgress: fullDayRouters.length = ${fullDayRouters.length}');
 
     return {
       'total': total,
@@ -236,13 +197,11 @@ class RoutersRepository {
           await LocalData.loadListJson(key: LocalDataKey.todayRouters);
       if (ttData.isNotEmpty && ttData.first['error'] == null) {
         todayRouters = ttData.map((mc) => MarketCenter.fromJson(mc)).toList();
-        Logger.i('todayRouters: ${todayRouters.length}');
       } else {
         await _saveTodayRouters();
       }
     } catch (e) {
       await _saveTodayRouters();
-      Logger.e('Failed to load today routers: $e');
     }
   }
 
@@ -264,26 +223,19 @@ class RoutersRepository {
     final user = Get.find<UserRepository>().user;
     if (user.id.isEmpty) return;
 
-    Logger.i('Начинаем загрузку с FTP для пользователя: ${user.id}');
-    Logger.i('filePath: ${user.filePath}');
-
     try {
       // Загружаем список ТЦ
-      Logger.i('Загружаем all_tt.json...');
       final ttData = await Api().downloadJsonFile('all_tt.json');
       if (ttData['error'] == null) {
         marketCenters = (ttData['marketCenters'] as List)
             .map((mc) => MarketCenter.fromJson(mc))
             .toList();
-        Logger.i('Загружено ТЦ: ${marketCenters.length}');
         errorMessage = ''; // Очищаем ошибку при успешной загрузке
       } else {
-        Logger.e('Ошибка загрузки all_tt.json: ${ttData['error']}');
         errorMessage = ttData['error'];
         return;
       }
       // Загружаем маршруты
-      Logger.i('Загружаем ${user.filePath}...');
       final routersData = await Api().downloadJsonFile(user.filePath);
       if (routersData['error'] == null) {
         weekRouters = (routersData['routers'] as List).map((r) {
@@ -300,9 +252,7 @@ class RoutersRepository {
             marketCenters: centers,
           );
         }).toList();
-        Logger.i('Загружено маршрутов: ${weekRouters.length}');
       } else {
-        Logger.e('Ошибка загрузки ${user.filePath}: ${routersData['error']}');
         isFileExist = false;
         errorMessage = routersData['error'];
         return;
@@ -312,19 +262,13 @@ class RoutersRepository {
       if (marketCenters.isNotEmpty) {
         errorMessage = ''; // Очищаем ошибку при успешной загрузке
         await _saveToLocal();
-        Logger.i(
-            'ТЕСТ: Данные сохранены локально (weekRouters пустой для тестирования)');
       } else {
         throw 'Failed to load data from FTP';
       }
     } catch (e) {
-      Logger.e('Failed to load from FTP: $e');
       // Не устанавливаем errorMessage при отсутствии интернета - работаем с локальными данными
-      if (e.toString().contains('SocketException') ||
-          e.toString().contains('No Internet')) {
-        Logger.w(
-            'FTP недоступен из-за отсутствия интернета, работаем с локальными данными');
-      } else {
+      if (!e.toString().contains('SocketException') &&
+          !e.toString().contains('No Internet')) {
         errorMessage = e.toString();
       }
       return;
@@ -348,7 +292,6 @@ class RoutersRepository {
           marketCenters: centers,
         );
       }).toList();
-      Logger.i('weekRouters: ${weekRouters.length}');
       todayRouters = getMarketCentersForDay(day: getCurrentDay());
       Get.find<UserRepository>().user.filePath = fileName;
       Get.find<UserRepository>().saveUserToLocal();
@@ -395,16 +338,14 @@ class RoutersRepository {
         }).toList();
       }
 
-      // Если локальных данных нет, просто логируем
+      // Если локальных данных нет, очищаем частично загруженные данные
       if (marketCenters.isEmpty || weekRouters.isEmpty) {
-        Logger.i('No local data found.');
-        // Очищаем частично загруженные данные
         marketCenters.clear();
         weekRouters.clear();
         return;
       }
     } catch (e) {
-      Logger.e('Failed to load from local: $e');
+      // Локальных данных нет
     }
   }
 
@@ -426,7 +367,7 @@ class RoutersRepository {
         key: LocalDataKey.routers,
       );
     } catch (e) {
-      Logger.e('Failed to save to local: $e');
+      // Ошибка сохранения
     }
   }
 
