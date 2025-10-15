@@ -727,24 +727,6 @@ class MainScanPageState extends State<MainScanPage> {
               previous.dayHystorySession.state !=
                   current.dayHystorySession.state;
 
-          Logger.i(
-              'buildWhen: totalTT ${previous.totalTT} -> ${current.totalTT}, completedTT ${previous.completedTT} -> ${current.completedTT}, hasUnsentSessions ${previous.hasUnsentSessions} -> ${current.hasUnsentSessions}, isTotalDay ${previous.isTotalDay} -> ${current.isTotalDay}, shouldShowDaySelection ${previous.shouldShowDaySelection} -> ${current.shouldShowDaySelection}, dayState ${previous.dayHystorySession.state} -> ${current.dayHystorySession.state}, shouldUpdate = $shouldUpdate');
-
-          if (shouldUpdate) {
-            Logger.i(
-                'buildWhen: обновляем UI - totalTT: ${previous.totalTT} -> ${current.totalTT}');
-            Logger.i(
-                'buildWhen: обновляем UI - completedTT: ${previous.completedTT} -> ${current.completedTT}');
-            Logger.i(
-                'buildWhen: обновляем UI - unsentTT: ${previous.unsentTT} -> ${current.unsentTT}');
-            Logger.i(
-                'buildWhen: обновляем UI - isTotalDay: ${previous.isTotalDay} -> ${current.isTotalDay}');
-            Logger.i(
-                'buildWhen: обновляем UI - dayHystorySession.length: ${previous.dayHystorySession.listSessions.length} -> ${current.dayHystorySession.listSessions.length}');
-            Logger.i(
-                'buildWhen: обновляем UI - dayHystorySession.state: ${previous.dayHystorySession.state} -> ${current.dayHystorySession.state}');
-          }
-
           return shouldUpdate;
         },
         builder: (context, state) {
@@ -780,9 +762,7 @@ class MainScanPageState extends State<MainScanPage> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      if (state.shouldShowDaySelection && !state.isFree) ...[
-                        Text(
-                            'DEBUG: shouldShowDaySelection = ${state.shouldShowDaySelection}, isFree = ${state.isFree}'),
+                      if (state.shouldShowDaySelection && !state.isFree)
                         UniversalDropdown<WeekDay>(
                           items: WeekDay.values,
                           value: selectedDay,
@@ -794,7 +774,6 @@ class MainScanPageState extends State<MainScanPage> {
                           label: 'Выберите день недели',
                           itemToString: (day) => day.title,
                         ),
-                      ],
                     ],
                   ),
                 ),
@@ -806,8 +785,6 @@ class MainScanPageState extends State<MainScanPage> {
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Text(
-                            'DEBUG: isFree = ${state.isFree}, todayRouters.length = ${state.todayRouters.length}'),
                         if (!state.isFree && state.todayRouters.isNotEmpty) ...[
                           // РЕЖИМ РОУТЕРОВ - кнопка "Начать работу" или "Дальше"
                           ButtonWide(

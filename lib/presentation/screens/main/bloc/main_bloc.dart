@@ -584,12 +584,6 @@ class MainBloc extends Bloc<MainEvent, MainState> {
 
     Logger.i(
         '_onCheckFirstLoginEvent: lastOpened = $lastOpened, hasWeekRouters = $hasWeekRouters, hasSessions = $hasSessions');
-    Logger.i(
-        '_onCheckFirstLoginEvent: userRepo.lastDay.state = ${userRepo.lastDay.state}');
-    Logger.i(
-        '_onCheckFirstLoginEvent: userRepo.hystorySessions.length = ${userRepo.hystorySessions.length}');
-    Logger.i(
-        '_onCheckFirstLoginEvent: state.shouldShowDaySelection = ${state.shouldShowDaySelection}');
 
     if (lastOpened == null && hasWeekRouters) {
       // Это первый заход И есть данные о днях недели - показываем выбор дня
@@ -624,9 +618,6 @@ class MainBloc extends Bloc<MainEvent, MainState> {
         shouldShowDaySelection: false,
       ));
     }
-
-    Logger.i(
-        '_onCheckFirstLoginEvent: ФИНАЛЬНОЕ СОСТОЯНИЕ - shouldShowDaySelection = ${state.shouldShowDaySelection}');
   }
 
   /// установка свободного режима
