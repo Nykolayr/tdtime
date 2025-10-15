@@ -8,6 +8,7 @@ import 'package:go_router/go_router.dart';
 import 'package:page_transition/page_transition.dart';
 import 'package:tdtime/presentation/screens/session/session_page.dart';
 import 'package:tdtime/presentation/screens/splash/splash.dart';
+import 'package:tdtime/presentation/screens/scan/qr_code_scan.dart';
 
 /// роутер приложения
 final GoRouter router = GoRouter(
@@ -64,6 +65,16 @@ final GoRouter router = GoRouter(
             context: context,
             state: state,
             child: const HistoryPage(),
+          ),
+        ),
+        GoRoute(
+          name: 'qr_scan',
+          path: 'qr_scan',
+          pageBuilder: (context, state) => buildPageWithDefaultTransition(
+            type: PageTransitionType.fade,
+            context: context,
+            state: state,
+            child: const QrScanPage(),
           ),
         ),
       ],

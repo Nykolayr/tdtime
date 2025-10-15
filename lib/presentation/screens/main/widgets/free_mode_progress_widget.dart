@@ -31,7 +31,7 @@ class FreeModeProgressWidget extends StatelessWidget {
         children: [
           Row(
             children: [
-              Icon(
+              const Icon(
                 Icons.schedule,
                 color: AppColor.yellow,
                 size: 16,

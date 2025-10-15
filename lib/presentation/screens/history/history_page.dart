@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter_easylogger/flutter_logger.dart';
 import 'package:get/get.dart';
 import 'package:tdtime/domain/models/session.dart';
 import 'package:tdtime/presentation/screens/main/bloc/main_bloc.dart';
@@ -97,7 +98,7 @@ class _HistoryPageState extends State<HistoryPage> {
       totalUnsent += sessions.length;
     }
 
-    print(
+    Logger.i(
         '_buildUploadButton: totalUnsent = $totalUnsent, hasUnsentSessions = ${state.hasUnsentSessions}');
 
     // Показываем кнопку только если есть неотправленные сессии

@@ -34,7 +34,7 @@ class MainPageState extends State<MainPage> {
     super.initState();
     pages = [
       MainScanPage(onTabChange: onItemTapped),
-      SettingsPage(),
+      const SettingsPage(),
     ];
   }
 

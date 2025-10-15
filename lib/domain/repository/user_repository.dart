@@ -422,7 +422,7 @@ class UserRepository {
   }
 
   /// Проверка первого входа пользователя
-  Future<void> _checkFirstLogin() async {
+  Future<void> checkFirstLogin() async {
     // Проверяем, есть ли сохраненные данные о последнем открытом дне
     final lastOpened =
         await Get.find<RoutersRepository>().loadLastOpenedWeekDay();

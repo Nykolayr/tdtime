@@ -45,6 +45,8 @@ class MainScanPageState extends State<MainScanPage> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       checkError();
+      // Загружаем данные из RoutersRepository
+      bloc.add(LoadRoutersEvent());
       // Проверяем неотправленные сессии при инициализации
       bloc.add(LoadUnsentSessionsEvent());
       // Восстанавливаем незавершенный день
@@ -144,7 +146,7 @@ class MainScanPageState extends State<MainScanPage> {
   }
 
   /// Проверка и навигация на страницу истории при наличии неотправленных сессий
-  void _checkAndNavigateToHistory() async {
+  void checkAndNavigateToHistory() async {
     // Ждем немного, чтобы состояние обновилось
     await Future.delayed(const Duration(milliseconds: 500));
 
@@ -247,7 +249,7 @@ class MainScanPageState extends State<MainScanPage> {
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(
-              'Введите название торговой точки:',
+              'Введите название торговой точки или отсканируйте QR-код:',
               style: AppText.text14.copyWith(color: AppColor.white),
             ),
             const SizedBox(height: 16),
@@ -257,6 +259,19 @@ class MainScanPageState extends State<MainScanPage> {
               controller: controller,
               validator: (value) =>
                   value?.isNotEmpty == true ? null : 'Введите название ТТ',
+            ),
+            const SizedBox(height: 12),
+            // Кнопка сканирования QR
+            SizedBox(
+              width: double.infinity,
+              child: ButtonWide(
+                text: 'Сканировать QR',
+                iconPath: 'assets/svg/qr_code.svg',
+                onPressed: () async {
+                  Navigator.of(context).pop();
+                  await _scanQRCode();
+                },
+              ),
             ),
           ],
         ),
@@ -288,6 +303,27 @@ class MainScanPageState extends State<MainScanPage> {
         ],
       ),
     );
+  }
+
+  /// Сканирование QR-кода для получения названия ТТ
+  Future<void> _scanQRCode() async {
+    try {
+      final result = await context.push<Barcode>('/main/qr_scan');
+
+      if (result != null && result.code != null) {
+        Logger.i('QR scan result: ${result.code}');
+        // Используем отсканированный код как название ТТ
+        _processTTSelection(result.code!);
+      } else {
+        Logger.w('QR scan cancelled or failed');
+        // Показываем диалог снова, если сканирование отменено
+        _showTTSearchDialog();
+      }
+    } catch (e) {
+      Logger.e('Error during QR scan: $e');
+      // Показываем диалог снова при ошибке
+      _showTTSearchDialog();
+    }
   }
 
   /// Обработка выбранной ТТ
@@ -393,7 +429,7 @@ class MainScanPageState extends State<MainScanPage> {
   }
 
   /// Виджет прогресса для свободного режима
-  Widget _buildFreeModeProgressWidget(MainState state, int completed) {
+  Widget buildFreeModeProgressWidget(MainState state, int completed) {
     Logger.i(
         '_buildFreeModeProgressWidget: completed = $completed, hasUnsentSessions = ${state.hasUnsentSessions}');
     Logger.i(
@@ -571,7 +607,7 @@ class MainScanPageState extends State<MainScanPage> {
   }
 
   /// Виджет статуса отправки сессий
-  Widget _buildUploadStatusWidget(MainState state) {
+  Widget buildUploadStatusWidget(MainState state) {
     UserRepository repo = Get.find<UserRepository>();
     Map<String, dynamic> status = repo.getTodayUploadStatus();
 
@@ -684,11 +720,15 @@ class MainScanPageState extends State<MainScanPage> {
               previous.unsentTT != current.unsentTT ||
               previous.isTotalDay != current.isTotalDay ||
               previous.hasUnsentSessions != current.hasUnsentSessions ||
+              previous.shouldShowDaySelection !=
+                  current.shouldShowDaySelection ||
               previous.dayHystorySession.listSessions.length !=
-                  current.dayHystorySession.listSessions.length;
+                  current.dayHystorySession.listSessions.length ||
+              previous.dayHystorySession.state !=
+                  current.dayHystorySession.state;
 
           Logger.i(
-              'buildWhen: totalTT ${previous.totalTT} -> ${current.totalTT}, completedTT ${previous.completedTT} -> ${current.completedTT}, hasUnsentSessions ${previous.hasUnsentSessions} -> ${current.hasUnsentSessions}, shouldUpdate = $shouldUpdate');
+              'buildWhen: totalTT ${previous.totalTT} -> ${current.totalTT}, completedTT ${previous.completedTT} -> ${current.completedTT}, hasUnsentSessions ${previous.hasUnsentSessions} -> ${current.hasUnsentSessions}, isTotalDay ${previous.isTotalDay} -> ${current.isTotalDay}, shouldShowDaySelection ${previous.shouldShowDaySelection} -> ${current.shouldShowDaySelection}, dayState ${previous.dayHystorySession.state} -> ${current.dayHystorySession.state}, shouldUpdate = $shouldUpdate');
 
           if (shouldUpdate) {
             Logger.i(
@@ -701,6 +741,8 @@ class MainScanPageState extends State<MainScanPage> {
                 'buildWhen: обновляем UI - isTotalDay: ${previous.isTotalDay} -> ${current.isTotalDay}');
             Logger.i(
                 'buildWhen: обновляем UI - dayHystorySession.length: ${previous.dayHystorySession.listSessions.length} -> ${current.dayHystorySession.listSessions.length}');
+            Logger.i(
+                'buildWhen: обновляем UI - dayHystorySession.state: ${previous.dayHystorySession.state} -> ${current.dayHystorySession.state}');
           }
 
           return shouldUpdate;
@@ -708,7 +750,7 @@ class MainScanPageState extends State<MainScanPage> {
         builder: (context, state) {
           return Scaffold(
             extendBodyBehindAppBar: true,
-            appBar: AppBars(
+            appBar: const AppBars(
               title: 'Сканирование',
               isBack: false,
               isLeft: true,
@@ -738,7 +780,9 @@ class MainScanPageState extends State<MainScanPage> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      if (state.shouldShowDaySelection && !state.isFree)
+                      if (state.shouldShowDaySelection && !state.isFree) ...[
+                        Text(
+                            'DEBUG: shouldShowDaySelection = ${state.shouldShowDaySelection}, isFree = ${state.isFree}'),
                         UniversalDropdown<WeekDay>(
                           items: WeekDay.values,
                           value: selectedDay,
@@ -750,89 +794,83 @@ class MainScanPageState extends State<MainScanPage> {
                           label: 'Выберите день недели',
                           itemToString: (day) => day.title,
                         ),
+                      ],
                     ],
                   ),
                 ),
                 Positioned(
                   bottom: 0,
                   left: 20,
-                  child: Column(
-                    children: [
-                      if (!state.isFree && state.todayRouters.isNotEmpty) ...[
-                        // РЕЖИМ РОУТЕРОВ - кнопка "Начать работу" или "Дальше"
-                        ButtonWide(
-                          text: state.dayHystorySession.listSessions.isNotEmpty
-                              ? 'Дальше'
-                              : 'Начать работу',
-                          iconPath: 'assets/svg/reader.svg',
-                          onPressed: () {
-                            Logger.i(
-                                'ПОКАЗЫВАЕМ КНОПКУ РОУТЕРОВ: isFree=${state.isFree}, todayRouters.length=${state.todayRouters.length}, completedSessions=${state.dayHystorySession.listSessions.length}');
-                            Logger.i(
-                                'Кнопка "${state.dayHystorySession.listSessions.isNotEmpty ? 'Дальше' : 'Начать работу'}" нажата');
-                            Logger.i(
-                                'todayRouters.length = ${state.todayRouters.length}');
-                            // Выбираем первую ТЦ из маршрута и начинаем сессию
-                            final firstTT = state.todayRouters.first;
-                            Logger.i('Выбираем первую ТЦ: ${firstTT.name}');
-                            bloc.add(
-                                SelectMarketCenterEvent(marketCenter: firstTT));
-                            startSession();
-                          },
-                        ),
-                      ] else if (state.isFree) ...[
-                        // СВОБОДНЫЙ РЕЖИМ - кнопка "Дальше"
-                        ButtonWide(
-                          text: 'Дальше',
-                          iconPath: 'assets/svg/reader.svg',
-                          onPressed: () {
-                            _startFreeModeSession();
-                          },
-                        ),
-                      ] else if (state.todayRouters.isNotEmpty) ...[
-                        ButtonWide(
-                          text: 'Дальше',
-                          iconPath: 'assets/svg/reader.svg',
-                          onPressed: () {
-                            // В обычном режиме выбираем первую ТЦ из маршрута
-                            if (state.todayRouters.isNotEmpty) {
+                  child: SizedBox(
+                    width: MediaQuery.of(context).size.width - 40,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                            'DEBUG: isFree = ${state.isFree}, todayRouters.length = ${state.todayRouters.length}'),
+                        if (!state.isFree && state.todayRouters.isNotEmpty) ...[
+                          // РЕЖИМ РОУТЕРОВ - кнопка "Начать работу" или "Дальше"
+                          ButtonWide(
+                            text: state.dayHystorySession.listSessions.isEmpty
+                                ? 'Начать работу'
+                                : 'Дальше',
+                            iconPath: 'assets/svg/reader.svg',
+                            onPressed: () {
+                              Logger.i(
+                                  'Кнопка "${state.dayHystorySession.listSessions.isEmpty ? 'Начать работу' : 'Дальше'}" нажата');
+                              // Выбираем первую ТЦ из маршрута и начинаем сессию
                               final firstTT = state.todayRouters.first;
+                              Logger.i('Выбираем первую ТЦ: ${firstTT.name}');
                               bloc.add(SelectMarketCenterEvent(
                                   marketCenter: firstTT));
                               startSession();
-                            }
-                          },
+                            },
+                          ),
+                        ] else if (state.isFree) ...[
+                          // СВОБОДНЫЙ РЕЖИМ - кнопка "Дальше"
+                          ButtonWide(
+                            text: 'Дальше',
+                            iconPath: 'assets/svg/reader.svg',
+                            onPressed: () {
+                              _startFreeModeSession();
+                            },
+                          ),
+                        ],
+                        const Gap(5),
+                        if (state
+                            .dayHystorySession.listSessions.isNotEmpty) ...[
+                          const Gap(10),
+                          if (state.dayHystorySession.state !=
+                              StateSession.close)
+                            _buildCloseDayButton(state)
+                          else
+                            _buildDayClosedMessage(),
+                        ],
+                        SizedBox(
+                          width: MediaQuery.of(context).size.width - 40,
+                          height: 40,
+                          child: (state.error.isNotEmpty || error.isNotEmpty)
+                              ? Column(
+                                  children: [
+                                    Expanded(
+                                      child: Text(
+                                        state.error.isNotEmpty
+                                            ? state.error
+                                            : error,
+                                        style: AppText.medium14.copyWith(
+                                          color: AppColor.redError,
+                                        ),
+                                        softWrap: true,
+                                        maxLines: 4,
+                                        textAlign: TextAlign.center,
+                                      ),
+                                    ),
+                                  ],
+                                )
+                              : null,
                         ),
                       ],
-                      const Gap(5),
-                      if (state.dayHystorySession.listSessions.isNotEmpty) ...[
-                        const Gap(10),
-                        _buildCloseDayButton(state),
-                      ],
-                      SizedBox(
-                        width: MediaQuery.of(context).size.width - 40,
-                        height: 40,
-                        child: (state.error.isNotEmpty || error.isNotEmpty)
-                            ? Column(
-                                children: [
-                                  Expanded(
-                                    child: Text(
-                                      state.error.isNotEmpty
-                                          ? state.error
-                                          : error,
-                                      style: AppText.medium14.copyWith(
-                                        color: AppColor.redError,
-                                      ),
-                                      softWrap: true,
-                                      maxLines: 4,
-                                      textAlign: TextAlign.center,
-                                    ),
-                                  ),
-                                ],
-                              )
-                            : null,
-                      ),
-                    ],
+                    ),
                   ),
                 ),
                 if (state.isLoading || isLoading)
@@ -860,12 +898,45 @@ class MainScanPageState extends State<MainScanPage> {
     );
   }
 
+  /// Сообщение о закрытом дне
+  Widget _buildDayClosedMessage() {
+    return Container(
+      width: MediaQuery.of(context).size.width - 40,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColor.green.withOpacity(0.2),
+        borderRadius: AppDif.borderRadius10,
+        border: Border.all(color: AppColor.green),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            Icons.check_circle,
+            color: AppColor.green,
+            size: 20,
+          ),
+          const Gap(8),
+          Flexible(
+            child: Text(
+              'Рабочий день закрыт',
+              style: AppText.medium14.copyWith(color: AppColor.green),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   /// Кнопка закрытия рабочего дня
   Widget _buildCloseDayButton(MainState state) {
-    UserRepository repo = Get.find<UserRepository>();
-    Map<String, dynamic> status = repo.getTodayUploadStatus();
-    int pending = status['pending'] as int;
-    bool hasUnsentSessions = pending > 0;
+    // Используем hasUnsentSessions из state, который учитывает все неотправленные сессии
+    bool hasUnsentSessions = state.hasUnsentSessions;
+
+    Logger.i('_buildCloseDayButton: hasUnsentSessions = $hasUnsentSessions');
+    Logger.i('_buildCloseDayButton: isEnable = ${!hasUnsentSessions}');
+    Logger.i(
+        '_buildCloseDayButton: onPressed = ${hasUnsentSessions ? "null" : "bloc.add(ClosedayEvent())"}');
 
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -873,8 +944,15 @@ class MainScanPageState extends State<MainScanPage> {
         ButtonWide(
           text: 'Закрыть рабочий день',
           iconPath: 'assets/svg/reader.svg',
-          onPressed:
-              hasUnsentSessions ? () {} : () => bloc.add(ClosedayEvent()),
+          onPressed: hasUnsentSessions
+              ? () {
+                  Logger.w(
+                      '_buildCloseDayButton: кнопка заблокирована из-за неотправленных сессий');
+                }
+              : () {
+                  Logger.i('_buildCloseDayButton: нажата кнопка закрытия дня');
+                  bloc.add(ClosedayEvent());
+                },
           isEnable:
               !hasUnsentSessions, // Делаем кнопку недоступной если есть неотправленные
         ),

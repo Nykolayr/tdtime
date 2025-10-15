@@ -23,6 +23,9 @@ class RoutersRepository {
   // Хранилище точек на сегодня
   List<MarketCenter> todayRouters = [];
 
+  // Выбранный день недели (для расчета прогресса)
+  WeekDay? selectedDay;
+
   // Флаг, указывающий на наличие файла с маршрутами
   bool isFileExist = false;
 
@@ -134,6 +137,9 @@ class RoutersRepository {
       Logger.i('  - ${route.day}: ${route.marketCenterIds.length} ТЦ');
     }
 
+    // Сохраняем выбранный день
+    selectedDay = day;
+
     todayRouters = getMarketCentersForDay(day: day);
     Logger.i('Получено todayRouters: ${todayRouters.length}');
 
@@ -197,12 +203,18 @@ class RoutersRepository {
     }
 
     // В режиме роутеров считаем правильно
-    // Получаем полный список торговых точек на сегодня (фиксированное количество)
+    // Получаем полный список торговых точек для выбранного дня (фиксированное количество)
+    WeekDay dayForProgress = selectedDay ?? getCurrentDay();
     List<MarketCenter> fullDayRouters =
-        getMarketCentersForDay(day: getCurrentDay());
+        getMarketCentersForDay(day: dayForProgress);
     int total =
         fullDayRouters.length; // Общее количество ТТ на день (не меняется)
     int remaining = total - completed; // Осталось = общее - обработанные
+
+    Logger.i(
+        'getDayProgress: selectedDay = $selectedDay, dayForProgress = $dayForProgress');
+    Logger.i(
+        'getDayProgress: fullDayRouters.length = ${fullDayRouters.length}');
 
     return {
       'total': total,

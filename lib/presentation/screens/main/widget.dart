@@ -4,7 +4,7 @@ import 'package:gap/gap.dart';
 import 'package:get/get.dart';
 import 'package:tdtime/domain/models/session.dart';
 import 'package:tdtime/domain/models/hystory_sessions.dart';
-import 'package:tdtime/presentation/screens/main/edti_TT.dart';
+import 'package:tdtime/presentation/screens/main/edti_tt.dart';
 import 'package:tdtime/presentation/theme/theme.dart';
 import 'package:tdtime/presentation/widgets/alerts.dart';
 
@@ -89,7 +89,7 @@ class UploadStatusWidget extends StatelessWidget {
       ),
       child: Row(
         children: [
-          Icon(
+          const Icon(
             Icons.cloud_upload,
             color: AppColor.white,
             size: 16,
@@ -101,7 +101,7 @@ class UploadStatusWidget extends StatelessWidget {
           ),
           const Gap(16),
           if (uploaded > 0) ...[
-            Icon(Icons.check_circle, color: AppColor.green, size: 16),
+            const Icon(Icons.check_circle, color: AppColor.green, size: 16),
             const Gap(4),
             Text(
               '$uploaded отправлено',
@@ -110,7 +110,7 @@ class UploadStatusWidget extends StatelessWidget {
             const Gap(16),
           ],
           if (pending > 0) ...[
-            Icon(Icons.schedule, color: AppColor.yellow, size: 16),
+            const Icon(Icons.schedule, color: AppColor.yellow, size: 16),
             const Gap(4),
             Text(
               '$pending ожидает',

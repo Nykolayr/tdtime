@@ -112,6 +112,26 @@ class MainBloc extends Bloc<MainEvent, MainState> {
     final todayRouters = Get.find<RoutersRepository>().todayRouters;
     Logger.i('todayRouters: ${todayRouters.length}');
 
+    // Обновляем прогресс дня для нового маршрута
+    RoutersRepository routersRepo = Get.find<RoutersRepository>();
+    UserRepository userRepo = Get.find<UserRepository>();
+    Map<String, dynamic> progress = routersRepo.getDayProgress();
+    Map<String, dynamic> unsentSessions = userRepo.getAllUnsentSessions();
+
+    // Рассчитываем новые значения прогресса
+    int totalTT = todayRouters.length;
+    int completedTT = userRepo.lastDay.listSessions.length;
+    int unsentTT = unsentSessions['hasUnsent'] as bool
+        ? (unsentSessions['unsentByDay'] as Map<String, List<SessionScan>>)
+            .values
+            .expand((list) => list)
+            .length
+        : 0;
+    bool isTotalDay = completedTT >= totalTT;
+
+    Logger.i(
+        '_onSelectDayEvent: totalTT = $totalTT, completedTT = $completedTT, unsentTT = $unsentTT, isTotalDay = $isTotalDay');
+
     emit(state.copyWith(
       isLoading: false,
       todayRouters: todayRouters,
@@ -119,6 +139,14 @@ class MainBloc extends Bloc<MainEvent, MainState> {
           todayRouters.isNotEmpty ? todayRouters.first : MarketCenter.init(),
       shouldShowDaySelection: false, // Скрываем выбор дня
       isFirstLogin: false, // Больше не первый вход
+      dayProgress: progress,
+      unsentSessions:
+          unsentSessions['unsentByDay'] as Map<String, List<SessionScan>>,
+      hasUnsentSessions: unsentSessions['hasUnsent'] as bool,
+      totalTT: totalTT,
+      completedTT: completedTT,
+      unsentTT: unsentTT,
+      isTotalDay: isTotalDay,
     ));
   }
 
@@ -169,6 +197,9 @@ class MainBloc extends Bloc<MainEvent, MainState> {
       isTotalDay: isTotalDay,
       isFree: repo.todayRouters.isEmpty,
     ));
+
+    // Проверяем первый вход после загрузки данных
+    add(CheckFirstLoginEvent());
   }
 
   /// обновление списка маршрутов
@@ -296,34 +327,51 @@ class MainBloc extends Bloc<MainEvent, MainState> {
   Future<void> _onClosedayEvent(
       ClosedayEvent event, Emitter<MainState> emit) async {
     UserRepository repo = Get.find<UserRepository>();
-    RoutersRepository routersRepo = Get.find<RoutersRepository>();
 
+    Logger.i('_onClosedayEvent: начинаем закрытие дня');
     emit(state.copyWith(isLoading: true));
     String answer = await repo.closeDay();
+    Logger.i('_onClosedayEvent: repo.closeDay() вернул: "$answer"');
     emit(state.copyWith(isLoading: false));
 
     if (answer.isNotEmpty) {
+      Logger.e('_onClosedayEvent: ошибка при закрытии дня: $answer');
       emit(state.copyWith(error: answer));
       await Future.delayed(const Duration(seconds: 5));
       emit(state.copyWith(error: ''));
     } else {
-      // Обновляем состояние после закрытия дня
-      Map<String, dynamic> unsentSessions = repo.getAllUnsentSessions();
+      // ПОЛНЫЙ РЕСТАРТ после закрытия дня - как при первом заходе
+      Logger.i('_onClosedayEvent: ПОЛНЫЙ РЕСТАРТ - очищаем все');
+
+      // Создаем новый день
+      repo.hystorySessions.add(HystorySessions.init());
+
+      // ВАЖНО: Сохраняем изменения в локальное хранилище
+      await repo.saveHystorySessionsToLocal();
+      Logger.i('_onClosedayEvent: Сохранено в локальное хранилище');
+
+      // Загружаем роутеры для нового дня
+      RoutersRepository routersRepo = Get.find<RoutersRepository>();
+      List<MarketCenter> todayRouters = routersRepo.todayRouters;
       Map<String, dynamic> progress = routersRepo.getDayProgress();
+      Map<String, dynamic> unsentSessions = repo.getAllUnsentSessions();
 
-      // Проверяем, нужно ли переходить к выбору дня
-      bool shouldShowDaySelection = routersRepo.todayRouters.isEmpty &&
-          !unsentSessions['hasUnsent'] as bool;
-
+      // Полностью очищаем состояние - как при первом заходе
       emit(state.copyWith(
         dayHystorySession: repo.lastDay,
         curSession: SessionScan.init(),
-        todayRouters: routersRepo.todayRouters,
+        todayRouters: todayRouters,
         dayProgress: progress,
         unsentSessions:
             unsentSessions['unsentByDay'] as Map<String, List<SessionScan>>,
         hasUnsentSessions: unsentSessions['hasUnsent'] as bool,
-        shouldShowDaySelection: shouldShowDaySelection,
+        shouldShowDaySelection: true, // Показываем выбор дня
+        totalTT: todayRouters.length,
+        completedTT: 0,
+        unsentTT: 0,
+        isTotalDay: false,
+        error: '',
+        isLoading: false,
       ));
     }
   }
@@ -523,12 +571,25 @@ class MainBloc extends Bloc<MainEvent, MainState> {
   Future<void> _onCheckFirstLoginEvent(
       CheckFirstLoginEvent event, Emitter<MainState> emit) async {
     final routersRepo = Get.find<RoutersRepository>();
+    final userRepo = Get.find<UserRepository>();
 
     // Проверяем, есть ли сохраненные данные о последнем открытом дне
     final lastOpened = await routersRepo.loadLastOpenedWeekDay();
 
     // Проверяем, есть ли загруженные маршруты для дней недели
     final hasWeekRouters = routersRepo.weekRouters.isNotEmpty;
+
+    // Проверяем, есть ли сессии в текущем дне
+    final hasSessions = userRepo.lastDay.listSessions.isNotEmpty;
+
+    Logger.i(
+        '_onCheckFirstLoginEvent: lastOpened = $lastOpened, hasWeekRouters = $hasWeekRouters, hasSessions = $hasSessions');
+    Logger.i(
+        '_onCheckFirstLoginEvent: userRepo.lastDay.state = ${userRepo.lastDay.state}');
+    Logger.i(
+        '_onCheckFirstLoginEvent: userRepo.hystorySessions.length = ${userRepo.hystorySessions.length}');
+    Logger.i(
+        '_onCheckFirstLoginEvent: state.shouldShowDaySelection = ${state.shouldShowDaySelection}');
 
     if (lastOpened == null && hasWeekRouters) {
       // Это первый заход И есть данные о днях недели - показываем выбор дня
@@ -546,14 +607,26 @@ class MainBloc extends Bloc<MainEvent, MainState> {
         shouldShowDaySelection: false,
         // error: 'Нет данных о маршрутах. Обратитесь к администратору.',
       ));
+    } else if (lastOpened != null && !hasSessions) {
+      // День выбран, но сессий нет - показываем выбор дня снова
+      Logger.i(
+          'День выбран ($lastOpened), но сессий нет - показываем выбор дня');
+      emit(state.copyWith(
+        isFirstLogin: false,
+        shouldShowDaySelection: true,
+      ));
     } else {
-      // Пользователь уже работал ранее
-      Logger.i('Пользователь уже работал ранее, последний день: $lastOpened');
+      // Пользователь уже работал ранее и есть сессии
+      Logger.i(
+          'Пользователь уже работал ранее, последний день: $lastOpened, сессий: ${userRepo.lastDay.listSessions.length}');
       emit(state.copyWith(
         isFirstLogin: false,
         shouldShowDaySelection: false,
       ));
     }
+
+    Logger.i(
+        '_onCheckFirstLoginEvent: ФИНАЛЬНОЕ СОСТОЯНИЕ - shouldShowDaySelection = ${state.shouldShowDaySelection}');
   }
 
   /// установка свободного режима

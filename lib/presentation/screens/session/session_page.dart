@@ -59,6 +59,7 @@ class DataMatrixScanPageState extends State<DataMatrixScanPage> {
 
       await Future.delayed(const Duration(milliseconds: 100));
       if (context.mounted) {
+        // ignore: use_build_context_synchronously
         GoRouter.of(context).pop();
       }
     } finally {
