@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter_easylogger/flutter_logger.dart';
 import 'package:gap/gap.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:get/get.dart';
@@ -87,17 +88,27 @@ class MainScanPageState extends State<MainScanPage> {
         const Duration(milliseconds: 1000)); // Увеличиваем задержку
 
     if (mounted) {
+      final routersRepo = Get.find<RoutersRepository>();
       final state = bloc.state;
+
+      Logger.i('_checkFreeMode: isFree = ${state.isFree}');
+      Logger.i(
+          '_checkFreeMode: weekRouters.length = ${routersRepo.weekRouters.length}');
+      Logger.i('_checkFreeMode: isFileExist = ${routersRepo.isFileExist}');
 
       // Если есть ошибка загрузки, не переходим дальше - остаемся на авторизации
       if (state.error.isNotEmpty || state.errorShowMessage.isNotEmpty) {
+        Logger.i('_checkFreeMode: есть ошибка, выходим');
         return;
       }
 
       // Если нет маршрутов, но файл загрузился - включаем свободный режим
       if (state.isFree) {
+        Logger.i('_checkFreeMode: isFree = true, показываем попап');
         bloc.add(const SetFreeModeEvent(isFreeMode: true));
         await showFreeModeDialog();
+      } else {
+        Logger.i('_checkFreeMode: isFree = false, попап не показываем');
       }
     }
   }
@@ -158,13 +169,22 @@ class MainScanPageState extends State<MainScanPage> {
     // Проверяем, есть ли данные о маршрутах - если есть, то ошибки нет
     final routersRepo = Get.find<RoutersRepository>();
 
+    Logger.i(
+        'checkError: weekRouters.length = ${routersRepo.weekRouters.length}');
+    Logger.i('checkError: errorMessage = "${routersRepo.errorMessage}"');
+    Logger.i('checkError: errorShowMessage = "${bloc.state.errorShowMessage}"');
+    Logger.i('checkError: isFreeMode = ${bloc.state.isFreeMode}');
+
     if (routersRepo.weekRouters.isNotEmpty) {
       // Данные загружены успешно, не показываем ошибку
+      Logger.i('checkError: Данные загружены успешно, пропускаем показ ошибки');
       return;
     }
 
     // Если включен свободный режим, не показываем ошибку о маршрутах
     if (bloc.state.isFreeMode) {
+      Logger.i(
+          'checkError: Свободный режим активен, пропускаем показ ошибки о маршрутах');
       return;
     }
 
@@ -300,7 +320,7 @@ class MainScanPageState extends State<MainScanPage> {
   void _processTTSelection(String ttInfo) async {
     // Создаем временную ТЦ для свободного режима
     final tempMarketCenter = MarketCenter(
-      id: 'free_${DateTime.now().millisecondsSinceEpoch}',
+      id: 'free_${ttInfo}',
       name: ttInfo,
       address: 'Свободный режим',
       phone: '',
@@ -365,8 +385,8 @@ class MainScanPageState extends State<MainScanPage> {
         ? bloc.state.selectedMarketCenter.id
         : (ttName ?? bloc.state.selectedMarketCenter.name);
 
-    // Генерируем уникальный sessionId для каждой сессии
-    String sessionId = '${ttId}_${DateTime.now().millisecondsSinceEpoch}';
+    // Используем ttId как sessionId без таймштампа
+    String sessionId = ttId;
 
     // Добавляем сессию в любом режиме
     bloc.add(
@@ -452,6 +472,7 @@ class MainScanPageState extends State<MainScanPage> {
       return FreeModeProgressWidget(
         completedTT: completed,
         unsentTT: unsent,
+        isDayClosed: state.dayHystorySession.state == StateSession.close,
         onViewHistory: () {
           GoRouter.of(context).go('/main/history');
         },

@@ -7,6 +7,7 @@ import 'package:tdtime/domain/models/hystory_sessions.dart';
 import 'package:tdtime/domain/models/week_routers.dart';
 import 'package:tdtime/domain/repository/user_repository.dart';
 import 'package:tdtime/data/local_data.dart';
+import 'package:flutter_easylogger/flutter_logger.dart';
 
 class RoutersRepository {
   static final RoutersRepository _instance = RoutersRepository._internal();
@@ -51,20 +52,32 @@ class RoutersRepository {
     // Сначала пытаемся загрузить с FTP (приоритет)
     bool ftpSuccess = false;
     try {
+      Logger.i('init: Пытаемся загрузить данные с FTP...');
       await _loadFromFtp();
-      if (marketCenters.isNotEmpty && weekRouters.isNotEmpty) {
+      if (marketCenters.isNotEmpty) {
+        Logger.i('init: Данные успешно загружены с FTP');
         ftpSuccess = true;
+      } else {
+        Logger.w('init: FTP загрузка не дала результатов');
       }
     } catch (e) {
-      // FTP недоступен, загружаем из локального хранилища
+      Logger.e('init: Failed to load from FTP: $e');
+      Logger.w(
+          'init: FTP недоступен, пытаемся загрузить с локального хранилища');
     }
 
     // Если FTP не удался, загружаем из локального хранилища
     if (!ftpSuccess) {
       try {
+        Logger.i('init: Загружаем данные из локального хранилища...');
         await _loadFromLocal();
+        if (marketCenters.isNotEmpty) {
+          Logger.i('init: Данные загружены из локального хранилища');
+        } else {
+          Logger.w('init: Локальных данных нет или они неполные');
+        }
       } catch (e) {
-        // Локальных данных нет
+        Logger.e('init: Failed to load from local: $e');
       }
     }
 
@@ -97,7 +110,7 @@ class RoutersRepository {
     await restoreUnfinishedDay();
 
     // Возвращаем true только если файл загрузился (есть данные)
-    bool hasData = marketCenters.isNotEmpty || weekRouters.isNotEmpty;
+    bool hasData = marketCenters.isNotEmpty;
     return hasData;
   }
 
@@ -223,36 +236,41 @@ class RoutersRepository {
     final user = Get.find<UserRepository>().user;
     if (user.id.isEmpty) return;
 
+    Logger.i(
+        '_loadFromFtp: Начинаем загрузку с FTP для пользователя: ${user.id}');
+    Logger.i('_loadFromFtp: filePath: ${user.filePath}');
+
     try {
       // Загружаем список ТЦ
+      Logger.i('_loadFromFtp: Загружаем all_tt.json...');
       final ttData = await Api().downloadJsonFile('all_tt.json');
       if (ttData['error'] == null) {
         marketCenters = (ttData['marketCenters'] as List)
             .map((mc) => MarketCenter.fromJson(mc))
             .toList();
+        Logger.i('_loadFromFtp: Загружено ТЦ: ${marketCenters.length}');
         errorMessage = ''; // Очищаем ошибку при успешной загрузке
       } else {
+        Logger.e(
+            '_loadFromFtp: Ошибка загрузки all_tt.json: ${ttData['error']}');
         errorMessage = ttData['error'];
         return;
       }
       // Загружаем маршруты
+      Logger.i('_loadFromFtp: Загружаем ${user.filePath}...');
       final routersData = await Api().downloadJsonFile(user.filePath);
       if (routersData['error'] == null) {
-        weekRouters = (routersData['routers'] as List).map((r) {
-          final ids = (r['marketCenterIds'] as List)
-              .map((id) => id.toString())
-              .toList();
-          final centers = ids
-              .map((id) => marketCenters.firstWhere((mc) => mc.id == id,
-                  orElse: () => MarketCenter.init()))
-              .toList();
-          return WeekRouters(
-            day: WeekDay.values.firstWhere((e) => e.name == r['day']),
-            marketCenterIds: ids,
-            marketCenters: centers,
-          );
-        }).toList();
+        Logger.i('_loadFromFtp: FTP: Загруженные данные: $routersData');
+        Logger.i(
+            '_loadFromFtp: FTP: routers.length = ${(routersData['routers'] as List).length}');
+
+        // Обрабатываем маршруты из FTP
+        weekRouters = (routersData['routers'] as List)
+            .map((router) => WeekRouters.fromJson(router))
+            .toList();
       } else {
+        Logger.e(
+            '_loadFromFtp: Ошибка загрузки ${user.filePath}: ${routersData['error']}');
         isFileExist = false;
         errorMessage = routersData['error'];
         return;
@@ -262,14 +280,20 @@ class RoutersRepository {
       if (marketCenters.isNotEmpty) {
         errorMessage = ''; // Очищаем ошибку при успешной загрузке
         await _saveToLocal();
+        Logger.i('_loadFromFtp: Данные сохранены локально');
       } else {
+        Logger.e('_loadFromFtp: marketCenters пустой, выбрасываем ошибку');
         throw 'Failed to load data from FTP';
       }
     } catch (e) {
+      Logger.e('_loadFromFtp: Exception: $e');
       // Не устанавливаем errorMessage при отсутствии интернета - работаем с локальными данными
       if (!e.toString().contains('SocketException') &&
           !e.toString().contains('No Internet')) {
         errorMessage = e.toString();
+        Logger.e('_loadFromFtp: Устанавливаем errorMessage: $errorMessage');
+      } else {
+        Logger.w('_loadFromFtp: Нет интернета, работаем с локальными данными');
       }
       return;
     }
@@ -310,16 +334,23 @@ class RoutersRepository {
     final user = Get.find<UserRepository>().user;
     if (user.id.isEmpty) return;
 
+    Logger.i('_loadFromLocal: Начинаем загрузку из локального хранилища');
+
     try {
       // Загружаем список ТЦ
+      Logger.i('_loadFromLocal: Загружаем список ТЦ...');
       final ttData = await LocalData.loadJson(key: LocalDataKey.marketCenters);
       if (ttData['error'] == null) {
         marketCenters = (ttData['marketCenters'] as List)
             .map((mc) => MarketCenter.fromJson(mc))
             .toList();
+        Logger.i('_loadFromLocal: Загружено ТЦ: ${marketCenters.length}');
+      } else {
+        Logger.w('_loadFromLocal: Ошибка загрузки ТЦ: ${ttData['error']}');
       }
 
       // Загружаем маршруты
+      Logger.i('_loadFromLocal: Загружаем маршруты...');
       final routersData =
           await LocalData.loadListJson(key: LocalDataKey.routers);
       if (routersData.isNotEmpty && routersData.first['error'] == null) {
@@ -336,16 +367,20 @@ class RoutersRepository {
                 .toList(),
           );
         }).toList();
+        Logger.i('_loadFromLocal: Загружено маршрутов: ${weekRouters.length}');
+      } else {
+        Logger.w('_loadFromLocal: Ошибка загрузки маршрутов или данных нет');
       }
 
       // Если локальных данных нет, очищаем частично загруженные данные
       if (marketCenters.isEmpty || weekRouters.isEmpty) {
+        Logger.w('_loadFromLocal: Локальных данных нет, очищаем');
         marketCenters.clear();
         weekRouters.clear();
         return;
       }
     } catch (e) {
-      // Локальных данных нет
+      Logger.e('_loadFromLocal: Exception: $e');
     }
   }
 
@@ -354,20 +389,25 @@ class RoutersRepository {
     final user = Get.find<UserRepository>().user;
     if (user.id.isEmpty) return;
 
+    Logger.i('_saveToLocal: Начинаем сохранение данных локально');
+
     try {
       // Сохраняем список ТЦ
+      Logger.i('_saveToLocal: Сохраняем список ТЦ...');
       final ttJson = {
         'marketCenters': marketCenters.map((mc) => mc.toJson()).toList(),
       };
       await LocalData.saveJson(json: ttJson, key: LocalDataKey.marketCenters);
 
       // Сохраняем маршруты
+      Logger.i('_saveToLocal: Сохраняем маршруты...');
       await LocalData.saveListJson(
         json: weekRouters.map((r) => r.toJson()).toList(),
         key: LocalDataKey.routers,
       );
+      Logger.i('_saveToLocal: Данные успешно сохранены локально');
     } catch (e) {
-      // Ошибка сохранения
+      Logger.e('_saveToLocal: Ошибка сохранения: $e');
     }
   }
 

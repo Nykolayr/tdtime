@@ -337,8 +337,10 @@ class MainBloc extends Bloc<MainEvent, MainState> {
       emit(state.copyWith(error: ''));
     } else {
       // ПОЛНЫЙ РЕСТАРТ после закрытия дня - как при первом заходе
-      // Создаем новый день
-      repo.hystorySessions.add(HystorySessions.init());
+      // Создаем новый день и устанавливаем состояние "закрыт"
+      HystorySessions newDay = HystorySessions.init();
+      newDay.state = StateSession.close; // Устанавливаем состояние "закрыт"
+      repo.hystorySessions.add(newDay);
 
       // ВАЖНО: Сохраняем изменения в локальное хранилище
       await repo.saveHystorySessionsToLocal();
@@ -358,7 +360,8 @@ class MainBloc extends Bloc<MainEvent, MainState> {
         unsentSessions:
             unsentSessions['unsentByDay'] as Map<String, List<SessionScan>>,
         hasUnsentSessions: unsentSessions['hasUnsent'] as bool,
-        shouldShowDaySelection: true, // Показываем выбор дня
+        shouldShowDaySelection:
+            !state.isFree, // Показываем выбор дня только в режиме роутеров
         totalTT: todayRouters.length,
         completedTT: 0,
         unsentTT: 0,

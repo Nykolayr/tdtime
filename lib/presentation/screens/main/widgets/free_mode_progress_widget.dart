@@ -8,6 +8,7 @@ class FreeModeProgressWidget extends StatelessWidget {
   final int unsentTT;
   final VoidCallback onViewHistory;
   final VoidCallback? onUploadAll;
+  final bool isDayClosed;
 
   const FreeModeProgressWidget({
     super.key,
@@ -15,6 +16,7 @@ class FreeModeProgressWidget extends StatelessWidget {
     required this.unsentTT,
     required this.onViewHistory,
     this.onUploadAll,
+    this.isDayClosed = false,
   });
 
   @override
@@ -22,24 +24,28 @@ class FreeModeProgressWidget extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: AppColor.blueFon2,
+        color:
+            isDayClosed ? AppColor.green.withOpacity(0.2) : AppColor.blueFon2,
         borderRadius: AppDif.borderRadius10,
-        border: Border.all(color: AppColor.white.withOpacity(0.3)),
+        border: Border.all(
+            color:
+                isDayClosed ? AppColor.green : AppColor.white.withOpacity(0.3)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              const Icon(
-                Icons.schedule,
-                color: AppColor.yellow,
+              Icon(
+                isDayClosed ? Icons.check_circle : Icons.schedule,
+                color: isDayClosed ? AppColor.green : AppColor.yellow,
                 size: 16,
               ),
               const Gap(8),
               Text(
-                'Прогресс дня',
-                style: AppText.medium12.copyWith(color: AppColor.white),
+                isDayClosed ? 'День завершен' : 'Прогресс дня',
+                style: AppText.medium12.copyWith(
+                    color: isDayClosed ? AppColor.green : AppColor.white),
               ),
             ],
           ),
