@@ -6,7 +6,7 @@ import 'package:gap/gap.dart';
 import 'package:get/get.dart';
 import 'package:go_router/go_router.dart';
 import 'package:package_info_plus/package_info_plus.dart';
-import 'package:qr_code_scanner/qr_code_scanner.dart';
+import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:tdtime/presentation/screens/auth/bloc/auth_bloc.dart';
 import 'package:tdtime/presentation/screens/scan/qr_code_scan.dart';
 import 'package:tdtime/presentation/theme/theme.dart';
@@ -21,7 +21,7 @@ class SplashPage extends StatefulWidget {
 
 class SplashPageState extends State<SplashPage> {
   final GlobalKey qrKey = GlobalKey(debugLabel: 'QR');
-  QRViewController? controller;
+  MobileScannerController? controller;
   String error = '';
   late Barcode result;
 
@@ -46,10 +46,10 @@ class SplashPageState extends State<SplashPage> {
     );
     if (!mounted) return;
     setState(() {});
-    if (result.code == null) {
+    if (result.rawValue == null) {
       error = 'Ошибка сканирования';
     } else {
-      List<String> fio = result.code!.split(' ');
+      List<String> fio = result.rawValue!.split(' ');
       Logger.i('fio ${fio.length} = $fio');
       if (fio.length != 3) {
         error = 'Отсканированные данные не соответсвуют формату';
@@ -106,8 +106,7 @@ class SplashPageState extends State<SplashPage> {
                       Image.asset('assets/run.gif'), // Ваш GIF
                       Positioned.fill(
                         child: Container(
-                          color: AppColor.blueFon
-                              .withOpacity(0.7), // Прозрачность 50%
+                          color: AppColor.blueFon.withValues(alpha: 0.7),
                         ),
                       ),
                     ],

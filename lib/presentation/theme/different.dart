@@ -10,13 +10,13 @@ class AppDif {
   static const BorderRadius borderRadius10 = BorderRadius.all(radius10);
   static const BorderRadius borderRadius5 = BorderRadius.all(radius5);
   static BoxShadow boxShadowMain = BoxShadow(
-    color: AppColor.blackText.withOpacity(0.5), // Цвет тени
+    color: AppColor.blackText.withValues(alpha: 0.5), // Цвет тени
     spreadRadius: 0, // Радиус рассеивания
     blurRadius: 25, // Радиус размытия
     offset: const Offset(0, 4), // Смещение тени
   );
   static BoxShadow boxCard = BoxShadow(
-    color: Colors.black.withOpacity(0.25), // 25% прозрачность
+    color: Colors.black.withValues(alpha: 0.25), // 25% прозрачность
     blurRadius: 150, // Размытие
     offset: const Offset(0, 4), // Смещение по X и Y
   );
@@ -65,11 +65,11 @@ class AppDif {
   );
   static LinearGradient gradientFonOpacity = LinearGradient(
     colors: [
-      AppColor.col1.withOpacity(0.05),
-      AppColor.col2.withOpacity(0.05),
-      AppColor.col3.withOpacity(0.05),
-      AppColor.col4.withOpacity(0.05),
-      AppColor.col5.withOpacity(0.05),
+      AppColor.col1.withValues(alpha: 0.05),
+      AppColor.col2.withValues(alpha: 0.05),
+      AppColor.col3.withValues(alpha: 0.05),
+      AppColor.col4.withValues(alpha: 0.05),
+      AppColor.col5.withValues(alpha: 0.05),
     ],
     stops: const [0.06, 0.24, 0.55, 0.79, 1.0], // Расстояния между цветами
     begin: Alignment.topLeft, // Начальная точка градиента
@@ -80,11 +80,11 @@ class AppDif {
 
   static gradientWithOpacity(double opacity) => LinearGradient(
         colors: [
-          AppColor.col1.withOpacity(opacity),
-          AppColor.col2.withOpacity(opacity),
-          AppColor.col3.withOpacity(opacity),
-          AppColor.col4.withOpacity(opacity),
-          AppColor.col5.withOpacity(opacity),
+          AppColor.col1.withValues(alpha: opacity),
+          AppColor.col2.withValues(alpha: opacity),
+          AppColor.col3.withValues(alpha: opacity),
+          AppColor.col4.withValues(alpha: opacity),
+          AppColor.col5.withValues(alpha: opacity),
         ],
         stops: const [0.06, 0.24, 0.55, 0.79, 1.0], // Расстояния между цветами
         begin: Alignment.topLeft, // Начальная точка градиента
@@ -116,8 +116,8 @@ class AppDif {
     end: Alignment.topCenter,
     stops: const [0.05, 0.75],
     colors: [
-      Colors.black.withOpacity(0.0),
-      Colors.black.withOpacity(0.48),
+      Colors.black.withValues(alpha: 0.0),
+      Colors.black.withValues(alpha: 0.48),
     ],
   );
   static BoxBorder borderAll = Border.all(

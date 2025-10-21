@@ -30,7 +30,7 @@ class ButtonWide extends StatelessWidget {
             width: MediaQuery.of(context).size.width - 50,
             height: 50,
             decoration: BoxDecoration(
-              color: AppColor.black.withOpacity(0.2),
+              color: AppColor.black.withValues(alpha: 0.2),
               border: AppDif.borderAll,
               borderRadius: AppDif.borderRadius10,
             ),
@@ -95,7 +95,7 @@ class ButtonSelf extends StatelessWidget {
             width: width,
             height: height,
             decoration: BoxDecoration(
-              color: Colors.black.withOpacity(0.3),
+              color: Colors.black.withValues(alpha: 0.3),
               borderRadius: AppDif.borderRadius20,
             ),
             child: Center(

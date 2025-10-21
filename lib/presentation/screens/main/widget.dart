@@ -85,7 +85,7 @@ class UploadStatusWidget extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColor.blueFon2,
         borderRadius: AppDif.borderRadius10,
-        border: Border.all(color: AppColor.white.withOpacity(0.3)),
+        border: Border.all(color: AppColor.white.withValues(alpha: 0.3)),
       ),
       child: Row(
         children: [
@@ -172,8 +172,8 @@ class ItemSession extends StatelessWidget {
       decoration: BoxDecoration(
         color: isClosed
             ? (isUploaded
-                ? AppColor.green.withOpacity(0.3)
-                : AppColor.yellow.withOpacity(0.3))
+                ? AppColor.green.withValues(alpha: 0.3)
+                : AppColor.yellow.withValues(alpha: 0.3))
             : AppColor.blueFon2,
         borderRadius: AppDif.borderRadius10,
         border: isClosed

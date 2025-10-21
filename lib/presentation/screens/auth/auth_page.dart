@@ -1,7 +1,7 @@
 import 'dart:math';
 
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:qr_code_scanner/qr_code_scanner.dart';
+import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:tdtime/common/utils.dart';
 import 'package:tdtime/presentation/screens/auth/bloc/auth_bloc.dart';
 import 'package:tdtime/presentation/screens/scan/qr_code_scan.dart';
@@ -24,7 +24,7 @@ class AuthPage extends StatefulWidget {
 
 class AuthPageState extends State<AuthPage> {
   final GlobalKey qrKey = GlobalKey(debugLabel: 'QR');
-  QRViewController? controller;
+  MobileScannerController? controller;
   String error = '';
   late Barcode result;
   final nameController = TextEditingController();
@@ -43,10 +43,10 @@ class AuthPageState extends State<AuthPage> {
               })),
     );
     setState(() {
-      if (result.code == null) {
+      if (result.rawValue == null) {
         error = 'Ошибка сканирования';
       } else {
-        List<String> fio = result.code!.split(' ');
+        List<String> fio = result.rawValue!.split(' ');
 
         if (fio.length != 3) {
           error = 'Отсканированные данные не соответсвуют формату';

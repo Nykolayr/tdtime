@@ -3,7 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:gap/gap.dart';
 import 'package:get/get.dart';
-import 'package:qr_code_scanner/qr_code_scanner.dart';
+import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:tdtime/common/utils.dart';
 import 'package:tdtime/presentation/screens/main/bloc/main_bloc.dart';
 import 'package:tdtime/presentation/screens/scan/qr_code_scan.dart';
@@ -57,11 +57,11 @@ class EditIdModal extends StatelessWidget {
                 ),
               );
 
-              if (result.code != null) {
+              if (result.rawValue != null) {
                 if (result.format != BarcodeFormat.dataMatrix) {
                   Get.find<MainBloc>().add(UpdateSessionIdEvent(
                     oldId: currentId,
-                    newId: result.code!,
+                    newId: result.rawValue!,
                   ));
                   if (context.mounted) {
                     Navigator.of(context).pop();

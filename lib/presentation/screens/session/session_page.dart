@@ -4,7 +4,7 @@ import 'package:flutter_easylogger/flutter_logger.dart';
 import 'package:gap/gap.dart';
 import 'package:get/get.dart';
 import 'package:go_router/go_router.dart';
-import 'package:qr_code_scanner/qr_code_scanner.dart';
+import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:tdtime/domain/repository/user_repository.dart';
 import 'package:tdtime/presentation/screens/main/bloc/main_bloc.dart';
 import 'package:tdtime/presentation/screens/main/widget.dart';
@@ -22,7 +22,7 @@ class DataMatrixScanPage extends StatefulWidget {
 class DataMatrixScanPageState extends State<DataMatrixScanPage> {
   final GlobalKey qrKey = GlobalKey(debugLabel: 'QR');
   MainBloc bloc = Get.find<MainBloc>();
-  QRViewController? controller;
+  MobileScannerController? controller;
   bool _isClosingSession = false;
   String error = '';
   bool isLoading = false;
@@ -83,7 +83,7 @@ class DataMatrixScanPageState extends State<DataMatrixScanPage> {
               })),
     );
 
-    if (result.code == null) {
+    if (result.rawValue == null) {
       error = 'Ошибка сканирования';
       setState(() {});
     } else {
@@ -91,9 +91,9 @@ class DataMatrixScanPageState extends State<DataMatrixScanPage> {
         error = 'Это не  DataMatrix формат!';
         setState(() {});
       } else {
-        Logger.i('result >>. ${result.code} === ${result.format}');
+        Logger.i('result >>. ${result.rawValue} === ${result.format}');
 
-        bloc.add(AddMatrixEvent(id: result.code!));
+        bloc.add(AddMatrixEvent(id: result.rawValue!));
         if (bloc.state.error.isEmpty && error.isEmpty) {}
       }
     }

@@ -36,7 +36,7 @@ class Api {
       hostFtp,
       user: loginFtp,
       pass: passFtp,
-      securityType: SecurityType.FTP,
+      securityType: SecurityType.ftp,
       port: 21,
       showLog: true,
     );
@@ -86,7 +86,7 @@ class Api {
         hostFtp,
         user: loginFtp,
         pass: passFtp,
-        securityType: SecurityType.FTP,
+        securityType: SecurityType.ftp,
       );
 
       await ftpConnect.connect();
@@ -124,7 +124,7 @@ class Api {
         hostFtp,
         user: loginFtp,
         pass: passFtp,
-        securityType: SecurityType.FTP,
+        securityType: SecurityType.ftp,
       );
 
       await ftpConnect.connect();

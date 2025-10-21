@@ -24,12 +24,14 @@ class FreeModeProgressWidget extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color:
-            isDayClosed ? AppColor.green.withOpacity(0.2) : AppColor.blueFon2,
+        color: isDayClosed
+            ? AppColor.green.withValues(alpha: 0.2)
+            : AppColor.blueFon2,
         borderRadius: AppDif.borderRadius10,
         border: Border.all(
-            color:
-                isDayClosed ? AppColor.green : AppColor.white.withOpacity(0.3)),
+            color: isDayClosed
+                ? AppColor.green
+                : AppColor.white.withValues(alpha: 0.3)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

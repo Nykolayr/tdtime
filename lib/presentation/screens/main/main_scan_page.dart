@@ -5,7 +5,7 @@ import 'package:gap/gap.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:get/get.dart';
 import 'package:go_router/go_router.dart';
-import 'package:qr_code_scanner/qr_code_scanner.dart';
+import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:tdtime/domain/models/hystory_sessions.dart';
 import 'package:tdtime/domain/models/market_center.dart';
 import 'package:tdtime/domain/models/session.dart';
@@ -33,7 +33,6 @@ class MainScanPage extends StatefulWidget {
 class MainScanPageState extends State<MainScanPage> {
   final GlobalKey qrKey = GlobalKey(debugLabel: 'QR');
   MainBloc bloc = Get.find<MainBloc>();
-  QRViewController? controller;
   String error = '';
   bool isLoading = false;
   late Barcode result;
@@ -69,7 +68,6 @@ class MainScanPageState extends State<MainScanPage> {
   @override
   void dispose() {
     _router.routerDelegate.removeListener(_onRouteChanged);
-    controller?.dispose();
     super.dispose();
   }
 
@@ -311,9 +309,9 @@ class MainScanPageState extends State<MainScanPage> {
     try {
       final result = await context.push<Barcode>('/main/qr_scan');
 
-      if (result != null && result.code != null) {
+      if (result != null && result.rawValue != null) {
         // Используем отсканированный код как название ТТ
-        _processTTSelection(result.code!);
+        _processTTSelection(result.rawValue!);
       } else {
         // Показываем диалог снова, если сканирование отменено
         _showTTSearchDialog();
@@ -328,7 +326,7 @@ class MainScanPageState extends State<MainScanPage> {
   void _processTTSelection(String ttInfo) async {
     // Создаем временную ТЦ для свободного режима
     final tempMarketCenter = MarketCenter(
-      id: 'free_${ttInfo}',
+      id: 'free_$ttInfo',
       name: ttInfo,
       address: 'Свободный режим',
       phone: '',
@@ -418,7 +416,7 @@ class MainScanPageState extends State<MainScanPage> {
       decoration: BoxDecoration(
         color: AppColor.blueFon2,
         borderRadius: AppDif.borderRadius10,
-        border: Border.all(color: AppColor.white.withOpacity(0.3)),
+        border: Border.all(color: AppColor.white.withValues(alpha: 0.3)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -519,7 +517,7 @@ class MainScanPageState extends State<MainScanPage> {
       decoration: BoxDecoration(
         color: AppColor.blueFon2,
         borderRadius: AppDif.borderRadius10,
-        border: Border.all(color: AppColor.white.withOpacity(0.3)),
+        border: Border.all(color: AppColor.white.withValues(alpha: 0.3)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -858,7 +856,7 @@ class MainScanPageState extends State<MainScanPage> {
       width: MediaQuery.of(context).size.width - 40,
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: AppColor.green.withOpacity(0.2),
+        color: AppColor.green.withValues(alpha: 0.2),
         borderRadius: AppDif.borderRadius10,
         border: Border.all(color: AppColor.green),
       ),

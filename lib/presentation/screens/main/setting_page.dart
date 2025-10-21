@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:gap/gap.dart';
 import 'package:get/get.dart';
 import 'package:go_router/go_router.dart';
-import 'package:qr_code_scanner/qr_code_scanner.dart';
+import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:tdtime/common/utils.dart';
 import 'package:tdtime/domain/models/user.dart';
 import 'package:tdtime/domain/repository/user_repository.dart';
@@ -54,10 +54,10 @@ class SettingsPageState extends State<SettingsPage> {
     );
     if (!mounted) return;
     setState(() {
-      if (result.code == null) {
+      if (result.rawValue == null) {
         error = 'Ошибка сканирования';
       } else {
-        List<String> fio = result.code!.split(' ');
+        List<String> fio = result.rawValue!.split(' ');
         if (fio.length != 3) {
           error = 'Отсканированные данные не соответсвуют формату';
         } else {
