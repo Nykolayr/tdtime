@@ -215,15 +215,16 @@ class MainScanPageState extends State<MainScanPage> {
           fileName: Get.find<UserRepository>().user.filePath,
           isFileExist: routersRepo.isFileExist,
         ));
-        await showErrorAlert(
-          context,
-          'Такого файла ${Get.find<UserRepository>().user.filePath} не существует, спросите у администратора название файла и поменяйте его в настройках!',
-          onOk: () {
-            if (mounted) {
-              widget.onTabChange(1);
-            }
-          },
-        );
+        // УБРАНО: Показ ошибки о несуществующем файле
+        // await showErrorAlert(
+        //   context,
+        //   'Такого файла ${Get.find<UserRepository>().user.filePath} не существует, спросите у администратора название файла и поменяйте его в настройках!',
+        //   onOk: () {
+        //     if (mounted) {
+        //       widget.onTabChange(1);
+        //     }
+        //   },
+        // );
       }
     }
   }

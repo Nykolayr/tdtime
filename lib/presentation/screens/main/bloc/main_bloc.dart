@@ -80,8 +80,7 @@ class MainBloc extends Bloc<MainEvent, MainState> {
         error: answer,
         isFileExist: false,
         filePath: event.fileName,
-        errorShowMessage:
-            'Такого файла ${event.fileName} не существует, спросите у администратора название файла и поменяйте его в настройках!',
+        errorShowMessage: '', // УБРАНО: Сообщение о несуществующем файле
       ));
       await Future.delayed(const Duration(seconds: 8));
       emit(state.copyWith(error: ''));
