@@ -26,7 +26,7 @@
 		<string>This app needs access to location when open.</string>
 		<key>NSLocationTemporaryUsageDescriptionDictionary</key>
 		<dict>
-			<key>YourPurposy</key>
+			<key>YourPurposeKey</key>
 			<string>The example App requires temporary access to the device&apos;s precise location.</string>
 		</dict>
 		<key>LSRequiresIPhoneOS</key>
