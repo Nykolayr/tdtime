@@ -109,9 +109,16 @@ class RoutersRepository {
     // Восстанавливаем незавершенный день, если есть
     await restoreUnfinishedDay();
 
-    // Возвращаем true только если файл загрузился (есть данные)
-    bool hasData = marketCenters.isNotEmpty;
-    return hasData;
+    // Если нет данных вообще, активируем свободный режим
+    if (marketCenters.isEmpty) {
+      Logger.i('init: Нет данных, активируем свободный режим');
+      marketCenters = []; // Пустой список для свободного режима
+      todayRouters = []; // Пустой список для свободного режима
+      isRouters = false; // Нет роутеров - свободный режим
+    }
+
+    // Возвращаем true всегда - либо с данными, либо в свободном режиме
+    return true;
   }
 
   /// убираем выбранный ТЦ из списка точек на сегодня
@@ -372,12 +379,18 @@ class RoutersRepository {
         Logger.w('_loadFromLocal: Ошибка загрузки маршрутов или данных нет');
       }
 
-      // Если локальных данных нет, очищаем частично загруженные данные
-      if (marketCenters.isEmpty || weekRouters.isEmpty) {
-        Logger.w('_loadFromLocal: Локальных данных нет, очищаем');
+      // Если нет торговых центров, очищаем все данные
+      if (marketCenters.isEmpty) {
+        Logger.w('_loadFromLocal: Нет торговых центров, очищаем все данные');
         marketCenters.clear();
         weekRouters.clear();
         return;
+      }
+
+      // Если нет маршрутов, но есть торговые центры - это нормально для свободного режима
+      if (weekRouters.isEmpty) {
+        Logger.i(
+            '_loadFromLocal: Нет маршрутов, но есть торговые центры - активируем свободный режим');
       }
     } catch (e) {
       Logger.e('_loadFromLocal: Exception: $e');

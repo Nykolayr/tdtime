@@ -204,6 +204,13 @@ class MainScanPageState extends State<MainScanPage> {
           },
         );
       } else {
+        // Если включен свободный режим, не показываем ошибку о файле
+        if (bloc.state.isFreeMode) {
+          Logger.i(
+              'checkError: Свободный режим активен, пропускаем показ ошибки о файле');
+          return;
+        }
+
         bloc.add(NewFileEvent(
           fileName: Get.find<UserRepository>().user.filePath,
           isFileExist: routersRepo.isFileExist,

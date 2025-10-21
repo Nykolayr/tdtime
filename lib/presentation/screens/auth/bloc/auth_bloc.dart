@@ -37,8 +37,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
         user: user,
         isSucsess: false,
         isLoading: false,
-        error:
-            'Не удалось загрузить данные. Проверьте подключение к интернету и правильность ID пользователя.',
+        error: '',
       ));
     }
   }
