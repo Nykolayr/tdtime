@@ -31,7 +31,7 @@
 		</dict>
 		<key>LSRequiresIPhoneOS</key>
 		<true/>
-		<key>LSMinimumSystemVersion</key>
+		<key>MinimumOSVersion</key>
 		<string>13.0</string>
 		<key>UILaunchStoryboardName</key>
 		<string>LaunchScreen</string>
