@@ -31,7 +31,11 @@ class MyApp extends StatelessWidget {
             mq.textScaler.clamp(minScaleFactor: 0.9, maxScaleFactor: 1.1);
         return MediaQuery(
           data: mq.copyWith(textScaler: fontScale),
-          child: child!,
+          child: SafeArea(
+            top: false,
+            bottom: true,
+            child: child!,
+          ),
         );
       },
     );
