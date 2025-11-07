@@ -6,7 +6,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 #com.hpace.tdtime
 #ТД Время
 
-version: 1.0.21+21
+version: 1.0.22+22
 
 # изменить имя
 # AndroidManifest.xml (located at android/app/src/main
