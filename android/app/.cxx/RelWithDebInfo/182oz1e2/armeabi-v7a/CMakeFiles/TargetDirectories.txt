@@ -1,0 +1,2 @@
+D:/Projects/TDtime/tdtime/android/app/.cxx/RelWithDebInfo/182oz1e2/armeabi-v7a/CMakeFiles/edit_cache.dir
+D:/Projects/TDtime/tdtime/android/app/.cxx/RelWithDebInfo/182oz1e2/armeabi-v7a/CMakeFiles/rebuild_cache.dir

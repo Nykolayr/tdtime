@@ -1,0 +1,2 @@
+D:/Projects/TDtime/tdtime/android/app/.cxx/RelWithDebInfo/182oz1e2/x86/CMakeFiles/edit_cache.dir
+D:/Projects/TDtime/tdtime/android/app/.cxx/RelWithDebInfo/182oz1e2/x86/CMakeFiles/rebuild_cache.dir

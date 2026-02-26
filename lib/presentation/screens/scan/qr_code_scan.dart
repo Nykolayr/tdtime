@@ -6,25 +6,32 @@ import 'package:tdtime/presentation/widgets/app_bar.dart';
 class ScanScreen extends StatefulWidget {
   final Function(Barcode) onScan;
 
-  const ScanScreen({Key? key, required this.onScan}) : super(key: key);
+  /// Если задано — сканируются только эти форматы; иначе QR + DataMatrix.
+  final List<BarcodeFormat>? formats;
+
+  const ScanScreen({
+    Key? key,
+    required this.onScan,
+    this.formats,
+  }) : super(key: key);
 
   @override
   State<ScanScreen> createState() => _ScanScreenState();
 }
 
 class _ScanScreenState extends State<ScanScreen> with WidgetsBindingObserver {
-  /// Контроллер сканера (QR + DataMatrix)
-  final MobileScannerController controller = MobileScannerController(
-    formats: const [BarcodeFormat.qrCode, BarcodeFormat.dataMatrix],
-    detectionSpeed: DetectionSpeed.normal,
-    detectionTimeoutMs: 800,
-  );
-
+  late final MobileScannerController controller;
   bool _isTorchOn = false;
 
   @override
   void initState() {
     super.initState();
+    controller = MobileScannerController(
+      formats: widget.formats ??
+          const [BarcodeFormat.qrCode, BarcodeFormat.dataMatrix],
+      detectionSpeed: DetectionSpeed.normal,
+      detectionTimeoutMs: 800,
+    );
     // для отслеживания changeLifecycle
     WidgetsBinding.instance.addObserver(this);
   }
@@ -124,9 +131,9 @@ class QRScannerOverlay extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Positioned.fill(
+    return const Positioned.fill(
       child: CustomPaint(
-        painter: const QRScannerOverlayPainter(),
+        painter: QRScannerOverlayPainter(),
       ),
     );
   }
