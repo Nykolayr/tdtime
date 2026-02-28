@@ -360,12 +360,12 @@ class DataMatrixScanPageState extends State<DataMatrixScanPage> {
                           iconPath: 'assets/svg/reader.svg',
                           onPressed: startPdf417Scanning,
                         ),
-                        const Gap(12),
-                        ButtonWide(
-                          text: 'Другие типы',
-                          iconPath: 'assets/svg/reader.svg',
-                          onPressed: _showOtherFormatsSheet,
-                        ),
+                        // const Gap(12),
+                        // ButtonWide(
+                        //   text: 'Другие типы',
+                        //   iconPath: 'assets/svg/reader.svg',
+                        //   onPressed: _showOtherFormatsSheet,
+                        // ),
                         const Gap(20),
                         ButtonWide(
                           text: _isClosingSession
