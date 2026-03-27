@@ -3,6 +3,7 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'package:tdtime/data/api/api.dart';
 import 'package:tdtime/data/api/dio_client.dart';
 import 'package:tdtime/domain/repository/routers_repository.dart';
+import 'package:tdtime/domain/repository/port_matrix_repository.dart';
 import 'package:tdtime/domain/repository/user_repository.dart';
 import 'package:tdtime/presentation/screens/auth/bloc/auth_bloc.dart';
 import 'package:tdtime/presentation/screens/main/bloc/main_bloc.dart';
@@ -36,6 +37,17 @@ Future initMain() async {
   } catch (e) {
     Logger.e('UserRepository = $e');
     return 'user $e';
+  }
+
+  try {
+    await Get.putAsync(() async {
+      final portMatrixRepository = PortMatrixRepository();
+      await portMatrixRepository.init();
+      return portMatrixRepository;
+    });
+  } catch (e) {
+    Logger.e('PortMatrixRepository = $e');
+    return 'portMatrix $e';
   }
 
   try {

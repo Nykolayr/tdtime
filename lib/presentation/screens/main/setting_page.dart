@@ -4,6 +4,8 @@ import 'package:get/get.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:tdtime/common/utils.dart';
+import 'package:tdtime/domain/models/port_matrix_device.dart';
+import 'package:tdtime/domain/repository/port_matrix_repository.dart';
 import 'package:tdtime/domain/models/user.dart';
 import 'package:tdtime/domain/repository/user_repository.dart';
 import 'package:tdtime/presentation/screens/auth/bloc/auth_bloc.dart';
@@ -12,6 +14,7 @@ import 'package:tdtime/presentation/screens/scan/qr_code_scan.dart';
 import 'package:tdtime/presentation/theme/theme.dart';
 import 'package:tdtime/presentation/widgets/app_bar.dart';
 import 'package:tdtime/presentation/widgets/buttons.dart';
+import 'package:tdtime/presentation/widgets/port_matrix_device_sheet.dart';
 import 'package:tdtime/presentation/widgets/row_with_filepath.dart';
 import 'package:tdtime/presentation/widgets/text_field2.dart';
 
@@ -30,8 +33,11 @@ class SettingsPageState extends State<SettingsPage> {
   final formKey = GlobalKey<FormState>();
   AuthBloc bloc = Get.find<AuthBloc>();
   MainBloc mainBloc = Get.find<MainBloc>();
+  final PortMatrixRepository portMatrixRepository =
+      Get.find<PortMatrixRepository>();
   bool isEdit = false;
   String error = '';
+  PortMatrixDevice? _selectedPortMatrixDevice;
   late Barcode result;
   late User user;
 
@@ -42,6 +48,35 @@ class SettingsPageState extends State<SettingsPage> {
     patronController.text = user.patron;
     idController.text = user.id;
     setState(() {});
+  }
+
+  Future<void> _loadPortMatrixDevice() async {
+    final device = await portMatrixRepository.loadDefaultDevice();
+    if (!mounted) return;
+    setState(() {
+      _selectedPortMatrixDevice = device;
+    });
+  }
+
+  Future<void> _selectPortMatrixDevice() async {
+    final selected = await showPortMatrixDeviceSheet(
+      context: context,
+      repository: portMatrixRepository,
+    );
+    if (selected == null) return;
+    await portMatrixRepository.saveDefaultDevice(selected);
+    if (!mounted) return;
+    setState(() {
+      _selectedPortMatrixDevice = selected;
+    });
+  }
+
+  Future<void> _disconnectPortMatrixDevice() async {
+    await portMatrixRepository.disconnectAndClearDefault();
+    if (!mounted) return;
+    setState(() {
+      _selectedPortMatrixDevice = null;
+    });
   }
 
   void startScanning() async {
@@ -80,6 +115,7 @@ class SettingsPageState extends State<SettingsPage> {
   void initState() {
     super.initState();
     getUser();
+    _loadPortMatrixDevice();
   }
 
   @override
@@ -161,6 +197,49 @@ class SettingsPageState extends State<SettingsPage> {
                 ),
                 const Gap(8),
                 RowWithFilePath(mainBloc: mainBloc),
+                const Gap(12),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: AppColor.blueFon2,
+                    borderRadius: AppDif.borderRadius10,
+                    border:
+                        Border.all(color: AppColor.white.withValues(alpha: 0.3)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Устройство для считывания',
+                        style: AppText.medium14.copyWith(color: AppColor.white),
+                      ),
+                      const Gap(6),
+                      Text(
+                        _selectedPortMatrixDevice == null
+                            ? 'Не выбрано'
+                            : '${_selectedPortMatrixDevice!.name}\n${_selectedPortMatrixDevice!.address}',
+                        style: AppText.text12.copyWith(color: AppColor.white),
+                      ),
+                      const Gap(10),
+                      ButtonWide(
+                        text: _selectedPortMatrixDevice == null
+                            ? 'Добавить устройство'
+                            : 'Изменить устройство',
+                        iconPath: 'assets/svg/reader.svg',
+                        onPressed: _selectPortMatrixDevice,
+                      ),
+                      if (_selectedPortMatrixDevice != null) ...[
+                        const Gap(8),
+                        ButtonWide(
+                          text: 'Отключить устройство',
+                          iconPath: 'assets/svg/exit.svg',
+                          onPressed: _disconnectPortMatrixDevice,
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
                 if (error.isNotEmpty)
                   Container(
                     height: 45,

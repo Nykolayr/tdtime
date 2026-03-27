@@ -1,9 +1,13 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_easylogger/flutter_logger.dart';
 import 'package:gap/gap.dart';
 import 'package:get/get.dart';
 import 'package:go_router/go_router.dart';
+import 'package:tdtime/domain/models/port_matrix_device.dart';
+import 'package:tdtime/domain/repository/port_matrix_repository.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:tdtime/domain/repository/user_repository.dart';
 import 'package:tdtime/presentation/screens/main/bloc/main_bloc.dart';
@@ -12,6 +16,7 @@ import 'package:tdtime/presentation/screens/scan/qr_code_scan.dart';
 import 'package:tdtime/presentation/theme/theme.dart';
 import 'package:tdtime/presentation/widgets/app_bar.dart';
 import 'package:tdtime/presentation/widgets/buttons.dart';
+import 'package:tdtime/presentation/widgets/port_matrix_device_sheet.dart';
 
 class DataMatrixScanPage extends StatefulWidget {
   const DataMatrixScanPage({Key? key}) : super(key: key);
@@ -24,18 +29,144 @@ class DataMatrixScanPageState extends State<DataMatrixScanPage> {
   MainBloc bloc = Get.find<MainBloc>();
   MobileScannerController? controller;
   bool _isClosingSession = false;
+  bool _isConnectingPortMatrix = false;
+  bool _isPortMatrixConnected = false;
   String error = '';
+  String _portMatrixStatus = 'Не подключен';
   bool isLoading = false;
   late Barcode result;
+  final PortMatrixRepository _portMatrixRepository =
+      Get.find<PortMatrixRepository>();
+  StreamSubscription<String>? _portScanSubscription;
+  StreamSubscription<bool>? _portConnectionSubscription;
   @override
   void initState() {
     super.initState();
+    _portMatrixStatus = _portMatrixRepository.defaultDevice == null
+        ? 'Устройство не выбрано'
+        : 'Устройство выбрано: ${_portMatrixRepository.defaultDevice!.name}';
+    _isPortMatrixConnected = _portMatrixRepository.isConnected;
+    _portConnectionSubscription =
+        _portMatrixRepository.connectionStream.listen((connected) {
+      if (!mounted) return;
+      setState(() {
+        _isPortMatrixConnected = connected;
+        if (connected) {
+          final name =
+              _portMatrixRepository.defaultDevice?.name ?? 'Port Matrix';
+          _portMatrixStatus = 'Подключен: $name';
+        } else if (_portMatrixRepository.defaultDevice != null) {
+          _portMatrixStatus =
+              'Отключен: ${_portMatrixRepository.defaultDevice!.name}';
+        } else {
+          _portMatrixStatus = 'Не подключен';
+        }
+      });
+    });
+    _portScanSubscription = _portMatrixRepository.scanCodeStream.listen((code) {
+      final parsed = code.trim();
+      if (parsed.isEmpty) return;
+      bloc.add(AddMatrixEvent(id: parsed));
+      _showPortScanToast(parsed);
+    });
+    _tryAutoConnectPortMatrix();
   }
 
   @override
   void dispose() {
+    _portScanSubscription?.cancel();
+    _portConnectionSubscription?.cancel();
     controller?.dispose();
     super.dispose();
+  }
+
+  Future<void> _connectPortMatrix() async {
+    if (_isConnectingPortMatrix) return;
+    setState(() {
+      _isConnectingPortMatrix = true;
+      _portMatrixStatus = 'Подключение...';
+    });
+
+    final supported = await _portMatrixRepository.isBluetoothSupported();
+    if (!supported) {
+      if (!mounted) return;
+      setState(() {
+        _isConnectingPortMatrix = false;
+        _portMatrixStatus = 'Bluetooth не поддерживается';
+      });
+      return;
+    }
+
+    final enabled = await _portMatrixRepository.isBluetoothEnabled();
+    if (!enabled) {
+      if (!mounted) return;
+      setState(() {
+        _isConnectingPortMatrix = false;
+        _portMatrixStatus = 'Включите Bluetooth на устройстве';
+      });
+      return;
+    }
+
+    PortMatrixDevice? targetDevice = _portMatrixRepository.defaultDevice;
+    if (targetDevice == null) {
+      targetDevice = await showPortMatrixDeviceSheet(
+        context: context,
+        repository: _portMatrixRepository,
+      );
+      if (targetDevice == null) {
+        if (!mounted) return;
+        setState(() {
+          _isConnectingPortMatrix = false;
+          _portMatrixStatus = 'Устройство не выбрано';
+        });
+        return;
+      }
+    }
+
+    final connected = await _portMatrixRepository.connectAndSaveDefault(
+      device: targetDevice,
+    );
+
+    if (!mounted) return;
+    setState(() {
+      _isConnectingPortMatrix = false;
+      _isPortMatrixConnected = connected;
+      _portMatrixStatus =
+          connected ? 'Подключен: ${targetDevice!.name}' : 'Ошибка подключения';
+    });
+  }
+
+  Future<void> _tryAutoConnectPortMatrix() async {
+    if (_portMatrixRepository.defaultDevice == null ||
+        _portMatrixRepository.isConnected) {
+      return;
+    }
+    setState(() {
+      _isConnectingPortMatrix = true;
+      _portMatrixStatus = 'Автоподключение...';
+    });
+    final connected = await _portMatrixRepository.connectToDefaultDevice();
+    if (!mounted) return;
+    setState(() {
+      _isConnectingPortMatrix = false;
+      _isPortMatrixConnected = connected;
+      _portMatrixStatus = connected
+          ? 'Подключен: ${_portMatrixRepository.defaultDevice!.name}'
+          : 'Не удалось автоподключиться';
+    });
+  }
+
+  void _showPortScanToast(String code) {
+    if (!mounted) return;
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.hideCurrentSnackBar();
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text('Port Matrix: отсканирован код $code'),
+        backgroundColor: AppColor.blue,
+        duration: const Duration(seconds: 3),
+      ),
+    );
   }
 
   /// Закрытие сессии с лоадером
@@ -359,6 +490,26 @@ class DataMatrixScanPageState extends State<DataMatrixScanPage> {
                           text: 'Сканировать PDF417',
                           iconPath: 'assets/svg/reader.svg',
                           onPressed: startPdf417Scanning,
+                        ),
+                        const Gap(12),
+                        ButtonWide(
+                          text: _isConnectingPortMatrix
+                              ? 'Подключение Port Matrix...'
+                              : _isPortMatrixConnected
+                                  ? 'Port Matrix подключен'
+                                  : 'Портматрикс',
+                          iconPath: 'assets/svg/reader.svg',
+                          onPressed: _connectPortMatrix,
+                        ),
+                        const Gap(8),
+                        SizedBox(
+                          width: MediaQuery.of(context).size.width - 40,
+                          child: Text(
+                            _portMatrixStatus,
+                            style:
+                                AppText.text12.copyWith(color: AppColor.white),
+                            textAlign: TextAlign.center,
+                          ),
                         ),
                         // const Gap(12),
                         // ButtonWide(

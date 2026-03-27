@@ -235,7 +235,8 @@ class MainScanPageState extends State<MainScanPage> {
 
   /// Диалог поиска ТТ в свободном режиме
   void _showTTSearchDialog() {
-    final controller = TextEditingController();
+    final nameController = TextEditingController();
+    final codeController = TextEditingController();
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -244,35 +245,43 @@ class MainScanPageState extends State<MainScanPage> {
           'Ввод торговой точки',
           style: AppText.medium16.copyWith(color: AppColor.white),
         ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              'Введите название торговой точки или отсканируйте QR-код:',
-              style: AppText.text14.copyWith(color: AppColor.white),
-            ),
-            const SizedBox(height: 16),
-            BestFormField(
-              iconPath: 'assets/svg/account.svg',
-              hint: 'Название торговой точки',
-              controller: controller,
-              validator: (value) =>
-                  value?.isNotEmpty == true ? null : 'Введите название ТТ',
-            ),
-            const SizedBox(height: 12),
-            // Кнопка сканирования QR
-            SizedBox(
-              width: double.infinity,
-              child: ButtonWide(
-                text: 'Сканировать QR',
-                iconPath: 'assets/svg/qr_code.svg',
-                onPressed: () async {
-                  Navigator.of(context).pop();
-                  await _scanQRCode();
-                },
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                'Введите название или код ТТ, либо отсканируйте QR-код:',
+                style: AppText.text14.copyWith(color: AppColor.white),
               ),
-            ),
-          ],
+              const SizedBox(height: 16),
+              BestFormField(
+                iconPath: 'assets/svg/account.svg',
+                hint: 'Название торговой точки',
+                controller: nameController,
+                validator: (_) => null,
+              ),
+              const SizedBox(height: 12),
+              BestFormField(
+                iconPath: 'assets/svg/qr_code.svg',
+                hint: 'Код ТТ (как при скане QR)',
+                controller: codeController,
+                validator: (_) => null,
+              ),
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                child: ButtonWide(
+                  text: 'Сканировать QR',
+                  iconPath: 'assets/svg/qr_code.svg',
+                  onPressed: () async {
+                    Navigator.of(context).pop();
+                    await _scanQRCode();
+                  },
+                ),
+              ),
+            ],
+          ),
         ),
         actions: [
           Row(
@@ -290,9 +299,14 @@ class MainScanPageState extends State<MainScanPage> {
                   text: 'ОК',
                   iconPath: 'assets/svg/start.svg',
                   onPressed: () {
-                    if (controller.text.isNotEmpty) {
+                    final code = codeController.text.trim();
+                    final name = nameController.text.trim();
+                    if (code.isNotEmpty) {
                       Navigator.of(context).pop();
-                      _processTTSelection(controller.text);
+                      _processTTSelection(code);
+                    } else if (name.isNotEmpty) {
+                      Navigator.of(context).pop();
+                      _processTTSelection(name);
                     }
                   },
                 ),
