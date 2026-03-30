@@ -312,8 +312,6 @@ class MainBloc extends Bloc<MainEvent, MainState> {
     String answer = repo.addMatrix(id: event.id);
     if (answer.isNotEmpty) {
       emit(state.copyWith(error: answer));
-      await Future.delayed(const Duration(seconds: 5));
-      emit(state.copyWith(error: ''));
     } else {
       emit(state.copyWith(
           dayHystorySession: repo.lastDay,

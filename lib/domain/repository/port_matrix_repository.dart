@@ -28,6 +28,10 @@ class PortMatrixRepository {
   bool _isConnected = false;
   bool _manualDisconnect = false;
   Timer? _reconnectTimer;
+  String? _lastEmittedCode;
+  DateTime? _lastEmittedAt;
+  DateTime? _lastAnyEmitAt;
+  static const int _minEmitIntervalMs = 300;
 
   Stream<String> get scanCodeStream => _scanCodeController.stream;
   Stream<bool> get connectionStream => _connectionController.stream;
@@ -73,13 +77,13 @@ class PortMatrixRepository {
 
   void _appendAndParse(String raw) {
     _scanBuffer += raw;
-    final parts = _scanBuffer.split(RegExp(r'[\r\n]+'));
+    final parts = _scanBuffer.split(RegExp(r'[\r\n\t]+'));
     if (parts.isEmpty) return;
 
     for (var i = 0; i < parts.length - 1; i++) {
       final code = parts[i].trim();
       if (code.isNotEmpty) {
-        _scanCodeController.add(code);
+        _emitCodeWithDebounce(code);
       }
     }
 
@@ -155,6 +159,7 @@ class PortMatrixRepository {
       Logger.e('PortMatrix disconnect error: $e');
     }
     _isConnected = false;
+    _scanBuffer = '';
     _connectionController.add(false);
   }
 
@@ -218,5 +223,22 @@ class PortMatrixRepository {
       return event.map((key, value) => MapEntry('$key', value));
     }
     return {};
+  }
+
+  void _emitCodeWithDebounce(String code) {
+    final now = DateTime.now();
+    if (_lastAnyEmitAt != null &&
+        now.difference(_lastAnyEmitAt!).inMilliseconds < _minEmitIntervalMs) {
+      return;
+    }
+    if (_lastEmittedCode == code &&
+        _lastEmittedAt != null &&
+        now.difference(_lastEmittedAt!).inMilliseconds < 1200) {
+      return;
+    }
+    _lastAnyEmitAt = now;
+    _lastEmittedCode = code;
+    _lastEmittedAt = now;
+    _scanCodeController.add(code);
   }
 }

@@ -536,7 +536,7 @@ class DataMatrixScanPageState extends State<DataMatrixScanPage> {
                       ],
                     ),
                   ),
-                  if (state.isLoading || isLoading)
+                  if (isLoading || _isClosingSession)
                     const Center(
                         child: CircularProgressIndicator.adaptive(
                             valueColor:
