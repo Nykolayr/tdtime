@@ -3,12 +3,30 @@ allprojects {
         google()
         mavenCentral()
     }
+    // Для Flutter DependencyVersionChecker и плагинов с ext.kotlin_version
+    ext.kotlin_version = "2.1.10"
 }
 
 rootProject.buildDir = "../build"
 subprojects {
     project.buildDir = "${rootProject.buildDir}/${project.name}"
 }
+
+// Подтянуть старые pub-плагины (например kotlin 1.7 в buildscript) к одному KGP.
+subprojects { subproject ->
+    subproject.buildscript {
+        def classpathCfg = configurations.findByName("classpath")
+        if (classpathCfg != null) {
+            classpathCfg.resolutionStrategy.eachDependency { details ->
+                if (details.requested.group == "org.jetbrains.kotlin" &&
+                        details.requested.name == "kotlin-gradle-plugin") {
+                    details.useVersion rootProject.ext.kotlin_version
+                }
+            }
+        }
+    }
+}
+
 subprojects {
     project.evaluationDependsOn(":app")
 }
@@ -18,13 +36,13 @@ tasks.register("clean", Delete) {
 }
 
 buildscript {
-    ext.kotlin_version = '1.9.24' // Обновленная версия под AGP 8.6
+    ext.kotlin_version = "2.1.10"
     repositories {
         google()
         mavenCentral()
     }
     dependencies {
-        classpath "com.android.tools.build:gradle:8.6.0"
+        classpath "com.android.tools.build:gradle:8.7.2"
         classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
     }
 }
