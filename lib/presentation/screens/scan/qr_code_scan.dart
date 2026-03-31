@@ -10,10 +10,10 @@ class ScanScreen extends StatefulWidget {
   final List<BarcodeFormat>? formats;
 
   const ScanScreen({
-    Key? key,
+    super.key,
     required this.onScan,
     this.formats,
-  }) : super(key: key);
+  });
 
   @override
   State<ScanScreen> createState() => _ScanScreenState();
@@ -185,7 +185,7 @@ class QRScannerOverlayPainter extends CustomPainter {
 }
 
 class QrScanPage extends StatefulWidget {
-  const QrScanPage({Key? key}) : super(key: key);
+  const QrScanPage({super.key});
 
   @override
   State<QrScanPage> createState() => _QrScanPageState();

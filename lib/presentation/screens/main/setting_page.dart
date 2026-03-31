@@ -19,7 +19,7 @@ import 'package:tdtime/presentation/widgets/row_with_filepath.dart';
 import 'package:tdtime/presentation/widgets/text_field2.dart';
 
 class SettingsPage extends StatefulWidget {
-  const SettingsPage({Key? key}) : super(key: key);
+  const SettingsPage({super.key});
   @override
   State<SettingsPage> createState() => SettingsPageState();
 }
@@ -41,7 +41,7 @@ class SettingsPageState extends State<SettingsPage> {
   late Barcode result;
   late User user;
 
-  getUser() {
+  void getUser() {
     user = repo.user;
     nameController.text = user.name;
     familyController.text = user.family;
@@ -315,10 +315,10 @@ class EditFileNameModal extends StatefulWidget {
   final void Function(String) onCheck;
 
   const EditFileNameModal({
-    Key? key,
+    super.key,
     required this.initialName,
     required this.onCheck,
-  }) : super(key: key);
+  });
 
   @override
   State<EditFileNameModal> createState() => _EditFileNameModalState();

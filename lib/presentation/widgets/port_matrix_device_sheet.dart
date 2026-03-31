@@ -73,7 +73,7 @@ Future<PortMatrixDevice?> showPortMatrixDeviceSheet({
                 Expanded(
                   child: ListView.separated(
                     itemCount: devices.length,
-                    separatorBuilder: (_, __) => const Gap(8),
+                    separatorBuilder: (context, index) => const Gap(8),
                     itemBuilder: (context, index) {
                       final item = devices[index];
                       return Material(

@@ -2,8 +2,9 @@ import 'package:flutter_easylogger/flutter_logger.dart';
 
 /// общий класс для ответов из Api
 class ResponseApi {
-  consoleRes(String path) {}
-  toJson() {}
+  void consoleRes(String path) {}
+
+  Map<String, dynamic> toJson() => <String, dynamic>{};
 }
 
 /// ошибка ответа из Api
@@ -11,7 +12,7 @@ class ResError extends ResponseApi {
   final String errorMessage;
   ResError({required this.errorMessage});
   @override
-  consoleRes(String path) {
+  void consoleRes(String path) {
     Logger.e('path: $path ResError: $errorMessage');
   }
 
@@ -28,7 +29,7 @@ class ResSuccess<T> extends ResponseApi {
   final T data;
   ResSuccess(this.data);
   @override
-  consoleRes(String path) {
+  void consoleRes(String path) {
     Logger.d('path: $path ResponseApi: $data');
   }
 

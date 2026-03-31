@@ -12,11 +12,11 @@ class EditFileNameModal extends StatefulWidget {
   final MainBloc mainBloc;
 
   const EditFileNameModal({
-    Key? key,
+    super.key,
     required this.initialName,
     required this.onCheck,
     required this.mainBloc,
-  }) : super(key: key);
+  });
 
   @override
   State<EditFileNameModal> createState() => _EditFileNameModalState();

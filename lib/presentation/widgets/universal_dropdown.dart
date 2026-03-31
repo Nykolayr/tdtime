@@ -10,13 +10,13 @@ class UniversalDropdown<T> extends StatelessWidget {
   final String Function(T) itemToString;
 
   const UniversalDropdown({
-    Key? key,
+    super.key,
     required this.items,
     required this.value,
     required this.onChanged,
     required this.label,
     required this.itemToString,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {

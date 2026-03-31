@@ -8,9 +8,9 @@ import 'package:tdtime/presentation/widgets/modal_edit_filepath.dart';
 class RowWithFilePath extends StatelessWidget {
   final MainBloc mainBloc;
   const RowWithFilePath({
-    Key? key,
+    super.key,
     required this.mainBloc,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {

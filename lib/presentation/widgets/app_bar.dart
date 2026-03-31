@@ -8,9 +8,12 @@ class AppBars extends StatefulWidget implements PreferredSizeWidget {
   final String title;
   final bool isBack;
   final bool isLeft;
-  const AppBars(
-      {Key? key, this.title = '', this.isBack = true, this.isLeft = false})
-      : super(key: key);
+  const AppBars({
+    super.key,
+    this.title = '',
+    this.isBack = true,
+    this.isLeft = false,
+  });
 
   @override
   Size get preferredSize => const Size.fromHeight(kToolbarHeight);

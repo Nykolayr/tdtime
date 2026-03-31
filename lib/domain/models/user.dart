@@ -1,5 +1,4 @@
 /// Класс, представляющий пользователя
-
 class User {
   String id;
   String family; // фамилия

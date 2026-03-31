@@ -187,7 +187,8 @@ void showErrorDialog(String errorMessage) async {
 }
 
 /// Алерт для сообщения
-Future showInfo(context, String title, {required Widget content}) async {
+Future<void> showInfo(BuildContext context, String title,
+    {required Widget content}) async {
   await showDialog(
     context: context,
     builder: (BuildContext context) {

@@ -24,7 +24,7 @@ import 'package:tdtime/presentation/widgets/universal_dropdown.dart';
 
 class MainScanPage extends StatefulWidget {
   final void Function(int) onTabChange;
-  const MainScanPage({Key? key, required this.onTabChange}) : super(key: key);
+  const MainScanPage({super.key, required this.onTabChange});
 
   @override
   State<MainScanPage> createState() => MainScanPageState();

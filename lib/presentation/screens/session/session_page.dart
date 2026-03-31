@@ -19,7 +19,7 @@ import 'package:tdtime/presentation/widgets/buttons.dart';
 import 'package:tdtime/presentation/widgets/port_matrix_device_sheet.dart';
 
 class DataMatrixScanPage extends StatefulWidget {
-  const DataMatrixScanPage({Key? key}) : super(key: key);
+  const DataMatrixScanPage({super.key});
   @override
   State<DataMatrixScanPage> createState() => DataMatrixScanPageState();
 }

@@ -1,6 +1,6 @@
 import 'dart:io';
+
 import 'package:flutter/material.dart';
-import 'package:sqlite3_flutter_libs/sqlite3_flutter_libs.dart';
 import 'package:tdtime/domain/injects.dart';
 import 'package:tdtime/domain/routers/routers.dart';
 
@@ -8,10 +8,6 @@ bool isMock = true;
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-
-  if (Platform.isAndroid) {
-    await applyWorkaroundToOpenSqlite3OnOldAndroidVersions();
-  }
 
   WidgetsBinding.instance.addObserver(AppLifecycleObserver());
   HttpOverrides.global = MyHttpOverrides();

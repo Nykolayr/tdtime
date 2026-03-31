@@ -17,10 +17,10 @@ class EditIdModal extends StatelessWidget {
   final TextEditingController controller;
 
   const EditIdModal({
-    Key? key,
+    super.key,
     required this.currentId,
     required this.controller,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {

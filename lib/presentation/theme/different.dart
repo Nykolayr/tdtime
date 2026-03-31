@@ -78,7 +78,7 @@ class AppDif {
         132.14 * 3.1415926535 / 180), // Угол вращения в радианах (45 градусов)
   );
 
-  static gradientWithOpacity(double opacity) => LinearGradient(
+  static LinearGradient gradientWithOpacity(double opacity) => LinearGradient(
         colors: [
           AppColor.col1.withValues(alpha: opacity),
           AppColor.col2.withValues(alpha: opacity),

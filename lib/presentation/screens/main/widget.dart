@@ -15,12 +15,12 @@ class ButtonTab extends StatelessWidget {
   final int index;
   final Function onTap;
 
-  const ButtonTab(
-      {Key? key,
-      required this.current,
-      required this.index,
-      required this.onTap})
-      : super(key: key);
+  const ButtonTab({
+    super.key,
+    required this.current,
+    required this.index,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -62,9 +62,9 @@ class UploadStatusWidget extends StatelessWidget {
   final List<SessionScan> sessions;
 
   const UploadStatusWidget({
-    Key? key,
+    super.key,
     required this.sessions,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -126,8 +126,8 @@ class UploadStatusWidget extends StatelessWidget {
 /// пустая страница, когда нет еще ни одной сессии
 class EmptySession extends StatelessWidget {
   const EmptySession({
-    Key? key,
-  }) : super(key: key);
+    super.key,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -153,10 +153,10 @@ class ItemSession extends StatelessWidget {
   final SessionScan? item;
   final String title;
   const ItemSession({
-    Key? key,
+    super.key,
     this.item,
     this.title = '',
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
