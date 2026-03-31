@@ -10,6 +10,9 @@ class SessionScan {
   StateSession state;
   bool isUploaded; // флаг для отслеживания отправки на сервер
 
+  /// PK в Drift (`route_session_rows`), null до первой записи в БД.
+  int? driftRowId;
+
   // Конструктор
   SessionScan({
     required this.id,
@@ -18,6 +21,7 @@ class SessionScan {
     required this.dataMatrix,
     required this.state,
     this.isUploaded = false,
+    this.driftRowId,
   });
 
   // Метод fromJson

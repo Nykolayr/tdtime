@@ -34,7 +34,8 @@ class DataMatrixScanPageState extends State<DataMatrixScanPage> {
   String error = '';
   String _portMatrixStatus = 'Не подключен';
   bool isLoading = false;
-  late Barcode result;
+  /// Результат последнего скана с камеры (null, если закрыли экран без скана).
+  Barcode? _cameraScanResult;
   final PortMatrixRepository _portMatrixRepository =
       Get.find<PortMatrixRepository>();
   StreamSubscription<String>? _portScanSubscription;
@@ -110,6 +111,7 @@ class DataMatrixScanPageState extends State<DataMatrixScanPage> {
     PortMatrixDevice? targetDevice = _portMatrixRepository.defaultDevice;
     if (targetDevice == null) {
       targetDevice = await showPortMatrixDeviceSheet(
+        // ignore: use_build_context_synchronously
         context: context,
         repository: _portMatrixRepository,
       );
@@ -204,29 +206,36 @@ class DataMatrixScanPageState extends State<DataMatrixScanPage> {
 
   /// Начало сканирования DataMatrix (только этот формат).
   void startScanning() async {
+    _cameraScanResult = null;
     isLoading = true;
     setState(() {});
-    await Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => ScanScreen(
-          formats: const [BarcodeFormat.dataMatrix],
-          onScan: (Barcode scanResult) {
-            result = scanResult;
-          },
+    try {
+      await Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => ScanScreen(
+            formats: const [BarcodeFormat.dataMatrix],
+            onScan: (Barcode scanResult) {
+              _cameraScanResult = scanResult;
+            },
+          ),
         ),
-      ),
-    );
+      );
 
-    if (result.rawValue == null) {
-      error = 'Ошибка сканирования';
-      setState(() {});
-    } else {
-      Logger.i('result >>. ${result.rawValue} === ${result.format}');
-      bloc.add(AddMatrixEvent(id: result.rawValue!));
+      final scan = _cameraScanResult;
+      if (scan == null || scan.rawValue == null) {
+        error = 'Ошибка сканирования';
+        setState(() {});
+      } else {
+        Logger.i('result >>. ${scan.rawValue} === ${scan.format}');
+        bloc.add(AddMatrixEvent(id: scan.rawValue!));
+      }
+    } finally {
+      if (mounted) {
+        isLoading = false;
+        setState(() {});
+      }
     }
-    isLoading = false;
-    setState(() {});
     await Future.delayed(const Duration(seconds: 8));
     error = '';
     if (mounted) {
@@ -236,189 +245,41 @@ class DataMatrixScanPageState extends State<DataMatrixScanPage> {
 
   /// Сканирование только PDF417.
   void startPdf417Scanning() async {
+    _cameraScanResult = null;
     isLoading = true;
     setState(() {});
-    await Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => ScanScreen(
-          formats: const [BarcodeFormat.pdf417],
-          onScan: (Barcode scanResult) {
-            result = scanResult;
-          },
+    try {
+      await Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => ScanScreen(
+            formats: const [BarcodeFormat.pdf417],
+            onScan: (Barcode scanResult) {
+              _cameraScanResult = scanResult;
+            },
+          ),
         ),
-      ),
-    );
+      );
 
-    if (result.rawValue == null) {
-      error = 'Ошибка сканирования';
-      setState(() {});
-    } else {
-      Logger.i('result PDF417 >>. ${result.rawValue}');
-      bloc.add(AddMatrixEvent(id: result.rawValue!));
+      final scan = _cameraScanResult;
+      if (scan == null || scan.rawValue == null) {
+        error = 'Ошибка сканирования';
+        setState(() {});
+      } else {
+        Logger.i('result PDF417 >>. ${scan.rawValue}');
+        bloc.add(AddMatrixEvent(id: scan.rawValue!));
+      }
+    } finally {
+      if (mounted) {
+        isLoading = false;
+        setState(() {});
+      }
     }
-    isLoading = false;
-    setState(() {});
     await Future.delayed(const Duration(seconds: 8));
     error = '';
     if (mounted) {
       setState(() {});
     }
-  }
-
-  /// Форматы, которые уже вынесены в отдельные кнопки — не показываем в «Другие».
-  static const _existingFormats = [
-    BarcodeFormat.dataMatrix,
-    BarcodeFormat.pdf417,
-  ];
-
-  /// Форматы, применяемые в РФ — в шторке показываем только их (UPC, Codabar, Aztec и т.п. убраны).
-  static const _formatsUsedInRF = [
-    BarcodeFormat.qrCode,
-    BarcodeFormat.code128,
-    BarcodeFormat.code39,
-    BarcodeFormat.ean13,
-    BarcodeFormat.ean8,
-    BarcodeFormat.itf,
-  ];
-
-  /// Название и описание формата для шторки (название (описание)).
-  static String _formatLabel(BarcodeFormat f) {
-    switch (f) {
-      case BarcodeFormat.qrCode:
-        return 'QR-код (двумерный, ссылки и текст)';
-      case BarcodeFormat.code128:
-        return 'Code 128 (логистика, этикетки, документы)';
-      case BarcodeFormat.code39:
-        return 'Code 39 (промышленность, медицина)';
-      case BarcodeFormat.ean13:
-        return 'EAN-13 (товары в магазинах)';
-      case BarcodeFormat.ean8:
-        return 'EAN-8 (короткий товарный код)';
-      case BarcodeFormat.itf:
-        return 'ITF (коробки, паллеты)';
-      default:
-        return f.name;
-    }
-  }
-
-  /// Показать шторку выбора «другого» типа штрихкода.
-  void _showOtherFormatsSheet() {
-    final otherFormats = BarcodeFormat.values
-        .where((f) =>
-            !_existingFormats.contains(f) &&
-            _formatsUsedInRF.contains(f) &&
-            f != BarcodeFormat.unknown &&
-            f != BarcodeFormat.all)
-        .toList();
-
-    if (otherFormats.isEmpty) return;
-
-    final screenHeight = MediaQuery.of(context).size.height;
-
-    showModalBottomSheet<void>(
-      context: context,
-      backgroundColor: Colors.transparent,
-      builder: (sheetContext) => Container(
-        height: screenHeight * 0.75,
-        decoration: const BoxDecoration(
-          color: AppColor.blueFon,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-        ),
-        padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 20),
-        child: SafeArea(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text(
-                'Выберите тип штрихкода',
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w600,
-                    ),
-                textAlign: TextAlign.center,
-              ),
-              const Gap(12),
-              Expanded(
-                child: SingleChildScrollView(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      for (var i = 0; i < otherFormats.length; i++) ...[
-                        if (i > 0) const Gap(14),
-                        Material(
-                          color: Colors.transparent,
-                          child: InkWell(
-                            onTap: () {
-                              Navigator.of(sheetContext).pop();
-                              startOtherFormatScanning(otherFormats[i]);
-                            },
-                            borderRadius: BorderRadius.circular(12),
-                            child: Container(
-                              width: double.infinity,
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                                vertical: 14,
-                              ),
-                              decoration: BoxDecoration(
-                                color: AppColor.darkBlueMain2,
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(
-                                  color: Colors.white.withValues(alpha: 0.25),
-                                  width: 1,
-                                ),
-                              ),
-                              child: Text(
-                                _formatLabel(otherFormats[i]),
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 15,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  /// Сканирование одного выбранного формата из «Другие типы».
-  Future<void> startOtherFormatScanning(BarcodeFormat format) async {
-    if (!mounted) return;
-    isLoading = true;
-    setState(() {});
-    await Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => ScanScreen(
-          formats: [format],
-          onScan: (Barcode scanResult) {
-            result = scanResult;
-          },
-        ),
-      ),
-    );
-
-    if (result.rawValue == null) {
-      error = 'Ошибка сканирования';
-      setState(() {});
-    } else {
-      Logger.i('result ${format.name} >>. ${result.rawValue}');
-      bloc.add(AddMatrixEvent(id: result.rawValue!));
-    }
-    isLoading = false;
-    setState(() {});
-    await Future.delayed(const Duration(seconds: 8));
-    error = '';
-    if (mounted) setState(() {});
   }
 
   /// отмена сканирования
@@ -462,17 +323,9 @@ class DataMatrixScanPageState extends State<DataMatrixScanPage> {
                     color: AppColor.blueFon,
                     child: (state.dayHystorySession.listSessions.isEmpty)
                         ? const EmptySession()
-                        : SingleChildScrollView(
-                            child: Column(
-                              children: [
-                                const Gap(70),
-                                ...state.dayHystorySession.listSessions.last
-                                    .dataMatrix.reversed
-                                    .map(
-                                  (e) => ItemSession(title: e),
-                                )
-                              ],
-                            ),
+                        : _ScannedPositionsList(
+                            dataMatrix:
+                                state.dayHystorySession.listSessions.last.dataMatrix,
                           ),
                   ),
                   Positioned(
@@ -511,12 +364,6 @@ class DataMatrixScanPageState extends State<DataMatrixScanPage> {
                             textAlign: TextAlign.center,
                           ),
                         ),
-                        // const Gap(12),
-                        // ButtonWide(
-                        //   text: 'Другие типы',
-                        //   iconPath: 'assets/svg/reader.svg',
-                        //   onPressed: _showOtherFormatsSheet,
-                        // ),
                         const Gap(20),
                         ButtonWide(
                           text: _isClosingSession
@@ -545,6 +392,38 @@ class DataMatrixScanPageState extends State<DataMatrixScanPage> {
               ),
             );
           }),
+    );
+  }
+}
+
+/// Список отсканированных позиций товара в ТТ — без построения сотен виджетов сразу.
+class _ScannedPositionsList extends StatelessWidget {
+  final List<String> dataMatrix;
+
+  const _ScannedPositionsList({required this.dataMatrix});
+
+  @override
+  Widget build(BuildContext context) {
+    final count = dataMatrix.length;
+    return CustomScrollView(
+      slivers: [
+        const SliverToBoxAdapter(child: Gap(70)),
+        SliverPadding(
+          padding: const EdgeInsets.only(bottom: 320),
+          sliver: SliverList(
+            delegate: SliverChildBuilderDelegate(
+              (context, index) {
+                final code = dataMatrix[count - 1 - index];
+                return ItemSession(
+                  key: ValueKey(code),
+                  title: code,
+                );
+              },
+              childCount: count,
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

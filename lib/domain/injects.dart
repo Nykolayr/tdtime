@@ -2,6 +2,7 @@ import 'package:flutter_easylogger/flutter_logger.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:tdtime/data/api/api.dart';
 import 'package:tdtime/data/api/dio_client.dart';
+import 'package:tdtime/data/drift/app_database.dart';
 import 'package:tdtime/domain/repository/routers_repository.dart';
 import 'package:tdtime/domain/repository/port_matrix_repository.dart';
 import 'package:tdtime/domain/repository/user_repository.dart';
@@ -16,6 +17,13 @@ Future initMain() async {
     PackageInfo packageInfo = await PackageInfo.fromPlatform();
     return packageInfo;
   });
+
+  try {
+    await Get.putAsync(() async => AppDatabase());
+  } catch (e) {
+    Logger.e('AppDatabase = $e');
+    return 'appDatabase $e';
+  }
 
   try {
     await Get.putAsync(() async {

@@ -5,11 +5,15 @@ class HystorySessions {
   DateTime time;
   StateSession state;
 
+  /// PK в Drift (`history_days`), null до вставки строки дня.
+  int? driftDayRowId;
+
   // Конструктор
   HystorySessions({
     required this.listSessions,
     required this.time,
     required this.state,
+    this.driftDayRowId,
   });
 
   // Метод для инициализации

@@ -1,5 +1,7 @@
 import 'package:geolocator/geolocator.dart';
 import 'package:tdtime/data/api/api.dart';
+import 'package:tdtime/data/drift/app_database.dart';
+import 'package:tdtime/data/drift/history_drift_repository.dart';
 import 'package:tdtime/data/local_data.dart';
 import 'package:tdtime/domain/models/hystory_sessions.dart';
 import 'package:tdtime/domain/models/session.dart';
@@ -17,6 +19,8 @@ class UserRepository {
   HystorySessions get lastDay => hystorySessions.last;
   List<HystorySessions> hystorySessions = [];
 
+  late final HistoryDriftRepository _historyStore;
+
   static final UserRepository _instance = UserRepository._internal();
 
   UserRepository._internal();
@@ -33,22 +37,46 @@ class UserRepository {
 
   /// Начальная загрузка пользователя из локального хранилища
   Future init() async {
-    // LocalData().clear();
+    _historyStore = HistoryDriftRepository(Get.find<AppDatabase>());
     await loadUserFromLocal();
     try {
-      await loadHystorySessionsFromLocal();
+      await _historyStore.migrateFromPrefsIfNeeded();
+      hystorySessions = await _historyStore.loadAllDays();
+      if (hystorySessions.isEmpty) {
+        final d = HystorySessions.init();
+        hystorySessions.add(d);
+        await _historyStore.insertNewDay(d);
+      }
     } catch (e) {
-      Logger.e('errror loadHystorySessionsFromLocal $e');
-    }
-
-    if (hystorySessions.isEmpty) {
-      hystorySessions.add(HystorySessions.init());
+      Logger.e('error load history from Drift $e');
+      final fallback = HystorySessions.init();
+      hystorySessions = [fallback];
+      try {
+        await _historyStore.insertNewDay(fallback);
+      } catch (e2) {
+        Logger.e('insertNewDay after history load error: $e2');
+      }
     }
 
     // Проверяем, есть ли неотправленные сессии в предыдущих днях
     await _checkForUnsentSessions();
 
     Logger.i('lastDay init ${lastDay.toJson()}');
+  }
+
+  /// Новый «день» при смене маршрута (выбор дня недели).
+  Future<void> addNewRouteDay() async {
+    final d = HystorySessions.init();
+    hystorySessions.add(d);
+    await _historyStore.insertNewDay(d);
+  }
+
+  /// Пустой закрытый день после [closeDay] (логика главного экрана).
+  Future<void> appendClosedEmptyDayAfterDayClose() async {
+    final newDay = HystorySessions.init();
+    newDay.state = StateSession.close;
+    hystorySessions.add(newDay);
+    await _historyStore.insertNewDay(newDay);
   }
 
   /// Проверка неотправленных сессий при инициализации
@@ -121,6 +149,7 @@ class UserRepository {
                   await Api().uploadHystorySessionsToFtp(data, fileName);
               if (answer.isEmpty) {
                 session.isUploaded = true;
+                await _historyStore.persistSessionFlags(session);
                 successCount++;
                 Logger.i('Сессия ${session.id} успешно отправлена');
               } else {
@@ -139,9 +168,6 @@ class UserRepository {
       }
     }
 
-    // Сохраняем обновленные данные
-    saveHystorySessionsToLocal();
-
     if (failCount == 0) {
       return '';
     } else {
@@ -150,21 +176,31 @@ class UserRepository {
   }
 
   /// удаление сессии
-  void deleteMatrix({required String id}) {
-    hystorySessions.last.listSessions.removeWhere((e) => e.id == id);
-    hystorySessions.last.state = StateSession.open;
-    saveHystorySessionsToLocal();
+  Future<void> deleteMatrix({required String id}) async {
+    final day = hystorySessions.last;
+    final dayDbId = day.driftDayRowId;
+    day.listSessions.removeWhere((e) => e.id == id);
+    day.state = StateSession.open;
+    if (dayDbId != null) {
+      await _historyStore.deleteSessionByTtIdOnDay(dayDbId, id);
+    }
   }
 
   /// отмена сканирования
-  void undoMatrix() {
-    hystorySessions.last.listSessions.removeLast();
-    hystorySessions.last.state = StateSession.open;
-    saveHystorySessionsToLocal();
+  Future<void> undoMatrix() async {
+    final day = hystorySessions.last;
+    if (day.listSessions.isEmpty) return;
+    day.listSessions.removeLast();
+    day.state = StateSession.open;
+    final dayDbId = day.driftDayRowId;
+    if (dayDbId != null) {
+      await _historyStore.deleteLastSessionOnDay(dayDbId);
+    }
   }
 
   /// Обновление ID сессии
-  String updateSessionId({required String oldId, required String newId}) {
+  Future<String> updateSessionId(
+      {required String oldId, required String newId}) async {
     final session = lastDay.listSessions.firstWhereOrNull((e) => e.id == oldId);
     if (session == null) {
       return 'Сессия не найдена!';
@@ -177,7 +213,10 @@ class UserRepository {
     }
 
     session.id = newId;
-    saveHystorySessionsToLocal();
+    final rid = session.driftRowId;
+    if (rid != null) {
+      await _historyStore.updateSessionTtId(rid, newId);
+    }
     return '';
   }
 
@@ -215,7 +254,7 @@ class UserRepository {
     Logger.i(
         'closeSession: после закрытия hystorySessions.last.listSessions.length = ${hystorySessions.last.listSessions.length}');
     Logger.i('${lastDay.listSessions.last.toJson()}');
-    saveHystorySessionsToLocal();
+    await _historyStore.persistSessionFlags(lastDay.listSessions.last);
 
     // Если была ошибка FTP, возвращаем сообщение об ошибке
     if (answer.isNotEmpty) {
@@ -228,13 +267,14 @@ class UserRepository {
   /// закрытие дня
   Future<String> closeDay() async {
     lastDay.state = StateSession.close;
+    final did = lastDay.driftDayRowId;
+    if (did != null) {
+      await _historyStore.updateDayState(did, StateSession.close);
+    }
 
     // Пытаемся повторно отправить все неотправленные сессии
     await _retryFailedUploads();
 
-    // НЕ создаем новый день здесь - это должно происходить только в конце дня
-    // hystorySessions.add(HystorySessions.init());
-    saveHystorySessionsToLocal();
     await Future.delayed(const Duration(seconds: 1));
     return '';
   }
@@ -258,6 +298,7 @@ class UserRepository {
                 await Api().uploadHystorySessionsToFtp(data, fileName);
             if (answer.isEmpty) {
               session.isUploaded = true;
+              await _historyStore.persistSessionFlags(session);
               Logger.i('Сессия ${session.id} успешно отправлена повторно');
             } else {
               Logger.w(
@@ -269,9 +310,6 @@ class UserRepository {
         }
       }
     }
-
-    // Сохраняем обновленные данные
-    saveHystorySessionsToLocal();
   }
 
   /// Проверка статуса отправки сессий за сегодня
@@ -322,6 +360,7 @@ class UserRepository {
                 await Api().uploadHystorySessionsToFtp(data, fileName);
             if (answer.isEmpty) {
               session.isUploaded = true;
+              await _historyStore.persistSessionFlags(session);
               successCount++;
               Logger.i('Сессия ${session.id} успешно отправлена');
             } else {
@@ -338,9 +377,6 @@ class UserRepository {
       }
     }
 
-    // Сохраняем обновленные данные
-    saveHystorySessionsToLocal();
-
     if (failCount == 0) {
       return '';
     } else {
@@ -349,11 +385,11 @@ class UserRepository {
   }
 
   /// Добавление сессии
-  String addHystorySessions({
+  Future<String> addHystorySessions({
     required String id,
     required String sessionId,
     required Position position,
-  }) {
+  }) async {
     final result =
         lastDay.listSessions.firstWhereOrNull((e) => e.id == sessionId);
     Logger.i(
@@ -375,19 +411,31 @@ class UserRepository {
           'addHystorySessions: после добавления lastDay.listSessions.length = ${lastDay.listSessions.length}');
       Logger.i(
           'addHystorySessions: после добавления hystorySessions.last.listSessions.length = ${hystorySessions.last.listSessions.length}');
-      saveHystorySessionsToLocal();
+      await _historyStore.insertSessionForDay(lastDay, tempSession);
     }
     return '';
   }
 
   /// Добавление DataMatrix в сессию
-  String addMatrix({required String id}) {
+  Future<String> addMatrix({required String id}) async {
     if (hystorySessions.last.listSessions.last.dataMatrix.contains(id)) {
       return 'Этот DataMatrix вы уже сканировали!';
+    }
+    hystorySessions.last.listSessions.last.dataMatrix.add(id);
+    hystorySessions.last.state = StateSession.inwork;
+    final day = hystorySessions.last;
+    final session = day.listSessions.last;
+    final dayId = day.driftDayRowId;
+    final sid = session.driftRowId;
+    if (dayId != null && sid != null) {
+      await _historyStore.appendScanLine(
+        dayId: dayId,
+        sessionDriftId: sid,
+        sortIndex: session.dataMatrix.length - 1,
+        code: id,
+      );
     } else {
-      hystorySessions.last.listSessions.last.dataMatrix.add(id);
-      hystorySessions.last.state = StateSession.inwork;
-      saveHystorySessionsToLocal();
+      Logger.e('addMatrix: нет drift id у дня или сессии');
     }
     return '';
   }
@@ -397,9 +445,11 @@ class UserRepository {
     await LocalData().clear();
     user = User.initial();
     hystorySessions.clear();
-    hystorySessions.add(HystorySessions.init());
+    await _historyStore.clearAll();
+    final d = HystorySessions.init();
+    hystorySessions.add(d);
+    await _historyStore.insertNewDay(d);
     Logger.i('lastDay ${lastDay.toJson()}');
-    await saveHystorySessionsToLocal();
   }
 
   /// авторизация пользователя
@@ -466,22 +516,4 @@ class UserRepository {
     await LocalData.saveJson(json: user.toJson(), key: LocalDataKey.user);
   }
 
-  /// Сохранение истории сессий в локальное хранилище
-  Future<void> saveHystorySessionsToLocal() async {
-    await LocalData.saveListJson(
-        json: hystorySessions.map((item) => item.toJson()).toList(),
-        key: LocalDataKey.hystorySessions);
-  }
-
-  /// Загрузка истории сессий из локального хранилища
-  Future<void> loadHystorySessionsFromLocal() async {
-    final data =
-        await LocalData.loadListJson(key: LocalDataKey.hystorySessions);
-    if (data.isNotEmpty && data.first['error'] == null) {
-      hystorySessions =
-          data.map((travel) => HystorySessions.fromJson(travel)).toList();
-    } else {
-      await saveHystorySessionsToLocal();
-    }
-  }
 }

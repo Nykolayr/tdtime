@@ -114,8 +114,7 @@ class MainBloc extends Bloc<MainEvent, MainState> {
     UserRepository userRepo = Get.find<UserRepository>();
 
     // Сбрасываем текущий день и начинаем новый для выбранного дня
-    userRepo.hystorySessions.add(HystorySessions.init());
-    await userRepo.saveHystorySessionsToLocal();
+    await userRepo.addNewRouteDay();
 
     final todayRouters = Get.find<RoutersRepository>().todayRouters;
 
@@ -217,7 +216,7 @@ class MainBloc extends Bloc<MainEvent, MainState> {
       DeleteMatrixEvent event, Emitter<MainState> emit) async {
     emit(state.copyWith(isLoading: true));
     UserRepository repo = Get.find<UserRepository>();
-    repo.deleteMatrix(id: event.id);
+    await repo.deleteMatrix(id: event.id);
     emit(state.copyWith(
       isLoading: false,
       dayHystorySession: repo.lastDay,
@@ -229,7 +228,7 @@ class MainBloc extends Bloc<MainEvent, MainState> {
   Future<void> _onUndoMatrixEvent(
       UndoMatrixEvent event, Emitter<MainState> emit) async {
     UserRepository repo = Get.find<UserRepository>();
-    repo.undoMatrix();
+    await repo.undoMatrix();
     emit(state.copyWith(
       dayHystorySession: repo.lastDay,
       curSession: repo.lastDay.listSessions.last,
@@ -240,8 +239,8 @@ class MainBloc extends Bloc<MainEvent, MainState> {
   Future<void> _onUpdateSessionIdEvent(
       UpdateSessionIdEvent event, Emitter<MainState> emit) async {
     UserRepository repo = Get.find<UserRepository>();
-    String answer =
-        repo.updateSessionId(oldId: event.oldId, newId: event.newId);
+    String answer = await repo.updateSessionId(
+        oldId: event.oldId, newId: event.newId);
     if (answer.isNotEmpty) {
       emit(state.copyWith(error: answer));
       await Future.delayed(const Duration(seconds: 6));
@@ -263,6 +262,7 @@ class MainBloc extends Bloc<MainEvent, MainState> {
             listSessions: updatedSessions,
             time: repo.lastDay.time,
             state: repo.lastDay.state,
+            driftDayRowId: repo.lastDay.driftDayRowId,
           ),
           curSession: updatedSessions[sessionIndex],
         ));
@@ -284,7 +284,7 @@ class MainBloc extends Bloc<MainEvent, MainState> {
       BeginSessinonEvent event, Emitter<MainState> emit) async {
     UserRepository repoUser = Get.find<UserRepository>();
     RoutersRepository repoRouters = Get.find<RoutersRepository>();
-    String answer = repoUser.addHystorySessions(
+    String answer = await repoUser.addHystorySessions(
         id: event.id, sessionId: event.sessionId, position: event.position);
     if (answer.isNotEmpty) {
       // Показываем ошибку FTP только в режиме маршрутов, не в свободном режиме
@@ -309,7 +309,7 @@ class MainBloc extends Bloc<MainEvent, MainState> {
   Future<void> _onAddMatrixEvent(
       AddMatrixEvent event, Emitter<MainState> emit) async {
     UserRepository repo = Get.find<UserRepository>();
-    String answer = repo.addMatrix(id: event.id);
+    String answer = await repo.addMatrix(id: event.id);
     if (answer.isNotEmpty) {
       emit(state.copyWith(error: answer));
     } else {
@@ -335,12 +335,7 @@ class MainBloc extends Bloc<MainEvent, MainState> {
     } else {
       // ПОЛНЫЙ РЕСТАРТ после закрытия дня - как при первом заходе
       // Создаем новый день и устанавливаем состояние "закрыт"
-      HystorySessions newDay = HystorySessions.init();
-      newDay.state = StateSession.close; // Устанавливаем состояние "закрыт"
-      repo.hystorySessions.add(newDay);
-
-      // ВАЖНО: Сохраняем изменения в локальное хранилище
-      await repo.saveHystorySessionsToLocal();
+      await repo.appendClosedEmptyDayAfterDayClose();
 
       // Загружаем роутеры для нового дня
       RoutersRepository routersRepo = Get.find<RoutersRepository>();
