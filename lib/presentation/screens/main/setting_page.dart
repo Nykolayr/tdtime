@@ -7,6 +7,7 @@ import 'package:tdtime/common/utils.dart';
 import 'package:tdtime/domain/models/port_matrix_device.dart';
 import 'package:tdtime/domain/repository/port_matrix_repository.dart';
 import 'package:tdtime/domain/models/user.dart';
+import 'package:tdtime/domain/repository/ftp_config_repository.dart';
 import 'package:tdtime/domain/repository/user_repository.dart';
 import 'package:tdtime/presentation/screens/auth/bloc/auth_bloc.dart';
 import 'package:tdtime/presentation/screens/main/bloc/main_bloc.dart';
@@ -15,6 +16,7 @@ import 'package:tdtime/presentation/theme/theme.dart';
 import 'package:tdtime/presentation/widgets/app_bar.dart';
 import 'package:tdtime/presentation/widgets/buttons.dart';
 import 'package:tdtime/presentation/widgets/port_matrix_device_sheet.dart';
+import 'package:tdtime/presentation/widgets/ftp_sheets.dart';
 import 'package:tdtime/presentation/widgets/row_with_filepath.dart';
 import 'package:tdtime/presentation/widgets/text_field2.dart';
 
@@ -37,6 +39,7 @@ class SettingsPageState extends State<SettingsPage> {
       Get.find<PortMatrixRepository>();
   bool isEdit = false;
   String error = '';
+  String _ftpDisplayHost = '';
   PortMatrixDevice? _selectedPortMatrixDevice;
   late Barcode result;
   late User user;
@@ -48,6 +51,14 @@ class SettingsPageState extends State<SettingsPage> {
     patronController.text = user.patron;
     idController.text = user.id;
     setState(() {});
+  }
+
+  Future<void> _loadFtpDisplayHost() async {
+    final h = await Get.find<FtpConfigRepository>().getDisplayHost();
+    if (!mounted) {
+      return;
+    }
+    setState(() => _ftpDisplayHost = h);
   }
 
   Future<void> _loadPortMatrixDevice() async {
@@ -115,6 +126,7 @@ class SettingsPageState extends State<SettingsPage> {
   void initState() {
     super.initState();
     getUser();
+    _loadFtpDisplayHost();
     _loadPortMatrixDevice();
   }
 
@@ -157,6 +169,41 @@ class SettingsPageState extends State<SettingsPage> {
                 const Text(
                     'Будьте бдительны при заполнении данных! В случае, если у вас возникли проблемы при эксплуатации данного приложения —пожалуйста, уведомите об этом старшего сотрудника, для скорейшего устранения выявляенных проблем.',
                     style: AppText.text10),
+                const Gap(15),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: AppColor.blueFon2,
+                    borderRadius: AppDif.borderRadius10,
+                    border: Border.all(
+                        color: AppColor.white.withValues(alpha: 0.3)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'FTP-сервер',
+                        style:
+                            AppText.medium14.copyWith(color: AppColor.white),
+                      ),
+                      const Gap(6),
+                      Text(
+                        _ftpDisplayHost.isEmpty ? '…' : _ftpDisplayHost,
+                        style: AppText.text12.copyWith(color: AppColor.white),
+                      ),
+                      const Gap(10),
+                      ButtonWide(
+                        text: 'Изменить параметры FTP',
+                        iconPath: 'assets/svg/edit.svg',
+                        onPressed: () async {
+                          await showFtpSettingsSheet(context);
+                          await _loadFtpDisplayHost();
+                        },
+                      ),
+                    ],
+                  ),
+                ),
                 const Gap(15),
                 BestFormField(
                   iconPath: 'assets/svg/account.svg',

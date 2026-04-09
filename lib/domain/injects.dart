@@ -2,6 +2,7 @@ import 'package:flutter_easylogger/flutter_logger.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:tdtime/data/api/api.dart';
 import 'package:tdtime/data/api/dio_client.dart';
+import 'package:tdtime/domain/repository/ftp_config_repository.dart';
 import 'package:tdtime/data/drift/app_database.dart';
 import 'package:tdtime/domain/repository/routers_repository.dart';
 import 'package:tdtime/domain/repository/port_matrix_repository.dart';
@@ -59,6 +60,7 @@ Future initMain() async {
   }
 
   try {
+    Get.put<FtpConfigRepository>(FtpConfigRepository());
     Get.put<DioClient>(DioClient(Dio()));
     Get.put<Api>(Api());
   } catch (e) {

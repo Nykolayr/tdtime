@@ -22,26 +22,28 @@ class ButtonWide extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: onPressed,
-      child: Stack(
-        alignment: AlignmentDirectional.center,
-        children: [
-          Container(
-            width: MediaQuery.of(context).size.width - 50,
-            height: 50,
-            decoration: BoxDecoration(
-              color: AppColor.black.withValues(alpha: 0.2),
-              border: AppDif.borderAll,
-              borderRadius: AppDif.borderRadius10,
+      onTap: isEnable ? onPressed : null,
+      child: Opacity(
+        opacity: isEnable ? 1 : 0.45,
+        child: Stack(
+          alignment: AlignmentDirectional.center,
+          children: [
+            Container(
+              width: MediaQuery.of(context).size.width - 50,
+              height: 50,
+              decoration: BoxDecoration(
+                color: AppColor.black.withValues(alpha: 0.2),
+                border: AppDif.borderAll,
+                borderRadius: AppDif.borderRadius10,
+              ),
             ),
-          ),
-          Center(
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                if (iconPath.isNotEmpty) SvgPicture.asset(iconPath, width: 20),
-                if (iconPath.isNotEmpty) const Gap(10),
-                Text(text,
+            Center(
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  if (iconPath.isNotEmpty) SvgPicture.asset(iconPath, width: 20),
+                  if (iconPath.isNotEmpty) const Gap(10),
+                  Text(text,
                     textAlign: TextAlign.center,
                     style: AppText.button16.copyWith(color: AppColor.white),
                     overflow: TextOverflow.ellipsis),
@@ -51,10 +53,11 @@ class ButtonWide extends StatelessWidget {
                     child: Icon(Icons.chevron_right,
                         size: 25, color: Colors.white),
                   ),
-              ],
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

@@ -1,10 +1,13 @@
 import 'package:gap/gap.dart';
 import 'package:get/get.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import 'package:tdtime/data/api/api.dart';
+import 'package:tdtime/domain/repository/ftp_config_repository.dart';
 import 'package:tdtime/presentation/screens/main/main_scan_page.dart';
 import 'package:tdtime/presentation/screens/main/setting_page.dart';
 import 'package:tdtime/presentation/screens/main/widget.dart';
 import 'package:tdtime/presentation/theme/theme.dart';
+import 'package:tdtime/presentation/widgets/ftp_sheets.dart';
 import 'package:flutter/material.dart';
 
 class MainPage extends StatefulWidget {
@@ -36,6 +39,24 @@ class MainPageState extends State<MainPage> {
       MainScanPage(onTabChange: onItemTapped),
       const SettingsPage(),
     ];
+    WidgetsBinding.instance.addPostFrameCallback((_) => _runFtpGate());
+  }
+
+  Future<void> _runFtpGate() async {
+    final api = Get.find<Api>();
+    final repo = Get.find<FtpConfigRepository>();
+    final c = await repo.getCredentials();
+    final ok = await api.testFtpConnection(c.host, c.login, c.password);
+    if (!mounted || ok) {
+      return;
+    }
+    await showFtpUnavailableSheet(
+      context: context,
+      onGoToSettings: () {
+        onItemTapped(1);
+        pageController.jumpToPage(1);
+      },
+    );
   }
 
   @override
