@@ -44,3 +44,7 @@ app.*.map.json
 
 # FVM Version Cache
 .fvm/
+
+# Временные бинарники sqlite3 (скачиваются в кэш hooks)
+tool/*.android.so
+tool/_uri_test.dart

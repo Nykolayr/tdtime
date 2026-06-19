@@ -83,6 +83,30 @@ Future<void> showErrorAlert(
   );
 }
 
+/// Подтверждение старта сессии на торговой точке.
+Future<bool> showTtStartConfirmation(
+  BuildContext context, {
+  required String ttId,
+  String? ttName,
+  String? address,
+}) async {
+  final lines = <String>[
+    if (ttName != null && ttName.isNotEmpty) ttName,
+    ttId,
+    if (address != null && address.isNotEmpty) address,
+  ];
+  final result = await showDialog<bool>(
+    context: context,
+    builder: (BuildContext context) {
+      return AlertSelf(
+        text: 'Начать работу?',
+        subText: lines.join('\n'),
+      );
+    },
+  );
+  return result == true;
+}
+
 /// Для показа кастомного содержимого
 Future<void> showModalContent(BuildContext context, String text, Widget child,
     Function() cansel, Function() save,

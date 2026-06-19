@@ -294,8 +294,14 @@ class MainBloc extends Bloc<MainEvent, MainState> {
         emit(state.copyWith(error: ''));
       }
     } else {
-      // Убираем выбранную ТЦ из списка
-      repoRouters.removeMarketCenter(state.selectedMarketCenter);
+      if (!state.isFree) {
+        final mc = event.marketCenter;
+        if (mc != null && mc.id.isNotEmpty) {
+          repoRouters.removeMarketCenterById(mc.id);
+        } else if (event.id.isNotEmpty) {
+          repoRouters.removeMarketCenterById(event.id);
+        }
+      }
 
       emit(state.copyWith(
         todayRouters: repoRouters.todayRouters,

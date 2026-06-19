@@ -6,6 +6,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:get/get.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
+import 'package:tdtime/common/tt_id_parser.dart';
 import 'package:tdtime/domain/models/hystory_sessions.dart';
 import 'package:tdtime/domain/models/market_center.dart';
 import 'package:tdtime/domain/models/session.dart';
@@ -14,6 +15,7 @@ import 'package:tdtime/domain/repository/routers_repository.dart';
 import 'package:tdtime/domain/repository/user_repository.dart';
 import 'package:tdtime/presentation/screens/main/bloc/main_bloc.dart';
 import 'package:tdtime/presentation/screens/main/get_position.dart';
+import 'package:tdtime/presentation/screens/scan/qr_code_scan.dart';
 import 'package:tdtime/presentation/screens/main/widgets/free_mode_progress_widget.dart';
 import 'package:tdtime/presentation/theme/theme.dart';
 import 'package:tdtime/presentation/widgets/alerts.dart';
@@ -298,15 +300,14 @@ class MainScanPageState extends State<MainScanPage> {
                 child: ButtonWide(
                   text: 'ОК',
                   iconPath: 'assets/svg/start.svg',
-                  onPressed: () {
+                  onPressed: () async {
                     final code = codeController.text.trim();
                     final name = nameController.text.trim();
+                    Navigator.of(context).pop();
                     if (code.isNotEmpty) {
-                      Navigator.of(context).pop();
-                      _processTTSelection(code);
+                      await _processTTSelection(code);
                     } else if (name.isNotEmpty) {
-                      Navigator.of(context).pop();
-                      _processTTSelection(name);
+                      await _processTTSelection(name);
                     }
                   },
                 ),
@@ -318,42 +319,116 @@ class MainScanPageState extends State<MainScanPage> {
     );
   }
 
+  /// Сканирование QR торговой точки (только QR, устойчивое чтение).
+  Future<Barcode?> _scanTtQrCode() async {
+    return Navigator.push<Barcode>(
+      context,
+      MaterialPageRoute(
+        builder: (context) => ScanScreen(
+          formats: kTtQrScanFormats,
+          requireStableRead: true,
+          title: 'Сканирование QR торговой точки',
+          onScan: (_) {},
+        ),
+      ),
+    );
+  }
+
+  /// Старт сессии в режиме маршрута: скан QR → проверка в маршруте → подтверждение.
+  Future<void> _startRouteModeSession() async {
+    final barcode = await _scanTtQrCode();
+    if (!mounted || barcode?.rawValue == null) return;
+
+    final raw = barcode!.rawValue!;
+    final ttId = TtIdParser.parse(raw);
+    Logger.i('_startRouteModeSession: raw=$raw parsed=$ttId');
+
+    if (ttId == null) {
+      await showErrorAlert(
+        context,
+        'Не удалось распознать номер ТТ.\nОтсканируйте QR-код торговой точки.',
+      );
+      return;
+    }
+
+    final mc = TtIdParser.findInList(bloc.state.todayRouters, ttId);
+    if (mc == null) {
+      await showErrorAlert(
+        context,
+        'ТТ $ttId нет в маршруте на сегодня.',
+      );
+      return;
+    }
+
+    final confirmed = await showTtStartConfirmation(
+      context,
+      ttId: mc.id,
+      ttName: mc.name.isNotEmpty ? mc.name : null,
+      address: mc.address.isNotEmpty ? mc.address : null,
+    );
+    if (!confirmed || !mounted) return;
+
+    bloc.add(SelectMarketCenterEvent(marketCenter: mc));
+    await startSession(marketCenter: mc);
+  }
+
   /// Сканирование QR-кода для получения названия ТТ
   Future<void> _scanQRCode() async {
     try {
-      final result = await context.push<Barcode>('/main/qr_scan');
+      final result = await _scanTtQrCode();
 
       if (result != null && result.rawValue != null) {
-        // Используем отсканированный код как название ТТ
-        _processTTSelection(result.rawValue!);
+        await _processTTSelection(result.rawValue!);
       } else {
-        // Показываем диалог снова, если сканирование отменено
         _showTTSearchDialog();
       }
     } catch (e) {
-      // Показываем диалог снова при ошибке
       _showTTSearchDialog();
     }
   }
 
-  /// Обработка выбранной ТТ
-  void _processTTSelection(String ttInfo) async {
-    // Создаем временную ТЦ для свободного режима
-    final tempMarketCenter = MarketCenter(
-      id: 'free_$ttInfo',
-      name: ttInfo,
-      address: 'Свободный режим',
-      phone: '',
+  /// Обработка выбранной ТТ (свободный режим)
+  Future<void> _processTTSelection(String ttInfo) async {
+    final parsedId = TtIdParser.parse(ttInfo);
+    final displayId = parsedId ?? ttInfo.trim();
+    if (displayId.isEmpty) return;
+
+    final routersRepo = Get.find<RoutersRepository>();
+    final MarketCenter resolved;
+
+    if (parsedId != null) {
+      final fromCatalog =
+          TtIdParser.findInList(routersRepo.marketCenters, parsedId);
+      resolved = fromCatalog ??
+          MarketCenter(
+            id: 'free_$parsedId',
+            name: parsedId,
+            address: 'Свободный режим',
+            phone: '',
+          );
+    } else {
+      resolved = MarketCenter(
+        id: 'free_$displayId',
+        name: displayId,
+        address: 'Свободный режим',
+        phone: '',
+      );
+    }
+
+    final sessionLabel = parsedId ?? displayId;
+    final confirmed = await showTtStartConfirmation(
+      context,
+      ttId: sessionLabel,
+      ttName: resolved.name != sessionLabel ? resolved.name : null,
+      address: resolved.address != 'Свободный режим' ? resolved.address : null,
     );
+    if (!confirmed || !mounted) return;
 
-    // Устанавливаем выбранную ТЦ
-    bloc.add(SelectMarketCenterEvent(marketCenter: tempMarketCenter));
-
-    // Начинаем сессию с переданным названием ТТ
-    startSession(ttName: ttInfo);
+    bloc.add(SelectMarketCenterEvent(marketCenter: resolved));
+    await startSession(marketCenter: resolved, ttName: sessionLabel);
   }
 
-  void startSession({String? ttName}) async {
+  Future<void> startSession({MarketCenter? marketCenter, String? ttName}) async {
     // Проверяем, есть ли активная сессия
     if (bloc.state.dayHystorySession.listSessions.isNotEmpty) {
       SessionScan lastSession = bloc.state.dayHystorySession.listSessions.last;
@@ -400,17 +475,22 @@ class MainScanPageState extends State<MainScanPage> {
       );
     }
 
-    // В свободном режиме используем переданное название ТТ, в обычном - ID из маршрута
-    String ttId = !bloc.state.isFree
-        ? bloc.state.selectedMarketCenter.id
-        : (ttName ?? bloc.state.selectedMarketCenter.name);
+    final mc = marketCenter ?? bloc.state.selectedMarketCenter;
+
+    // В свободном режиме используем переданное название ТТ, в обычном — ID из маршрута
+    String ttId =
+        !bloc.state.isFree ? mc.id : (ttName ?? mc.name);
 
     // Используем ttId как sessionId без таймштампа
     String sessionId = ttId;
 
     // Добавляем сессию в любом режиме
-    bloc.add(
-        BeginSessinonEvent(id: ttId, sessionId: sessionId, position: position));
+    bloc.add(BeginSessinonEvent(
+      id: ttId,
+      sessionId: sessionId,
+      position: position,
+      marketCenter: bloc.state.isFree ? null : mc,
+    ));
 
     // Ждем немного для обработки события и переходим
     await Future.delayed(const Duration(milliseconds: 500));
@@ -778,19 +858,19 @@ class MainScanPageState extends State<MainScanPage> {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         if (!state.isFree && state.todayRouters.isNotEmpty) ...[
-                          // РЕЖИМ РОУТЕРОВ - кнопка "Начать работу" или "Дальше"
+                          Text(
+                            'Осталось ${state.todayRouters.length} ТТ.\nОтсканируйте QR торговой точки.',
+                            style: AppText.text12
+                                .copyWith(color: AppColor.white),
+                            textAlign: TextAlign.center,
+                          ),
+                          const Gap(8),
                           ButtonWide(
                             text: state.dayHystorySession.listSessions.isEmpty
                                 ? 'Начать работу'
                                 : 'Дальше',
-                            iconPath: 'assets/svg/reader.svg',
-                            onPressed: () {
-                              // Выбираем первую ТЦ из маршрута и начинаем сессию
-                              final firstTT = state.todayRouters.first;
-                              bloc.add(SelectMarketCenterEvent(
-                                  marketCenter: firstTT));
-                              startSession();
-                            },
+                            iconPath: 'assets/svg/qr_code.svg',
+                            onPressed: _startRouteModeSession,
                           ),
                         ] else if (state.isFree) ...[
                           // СВОБОДНЫЙ РЕЖИМ - кнопка "Дальше"

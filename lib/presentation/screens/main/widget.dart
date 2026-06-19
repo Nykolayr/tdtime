@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/svg.dart';
 import 'package:gap/gap.dart';
 import 'package:get/get.dart';
+import 'package:tdtime/common/tt_id_parser.dart';
 import 'package:tdtime/domain/models/session.dart';
 import 'package:tdtime/domain/models/hystory_sessions.dart';
+import 'package:tdtime/domain/repository/routers_repository.dart';
 import 'package:tdtime/presentation/screens/main/edti_tt.dart';
 import 'package:tdtime/presentation/theme/theme.dart';
 import 'package:tdtime/presentation/widgets/alerts.dart';
@@ -223,15 +225,48 @@ class ItemSession extends StatelessWidget {
                   controller: controller,
                 ),
                 () => Navigator.pop(context),
-                () {
-                  final newId = controller.text;
-                  if (newId.isNotEmpty && newId != item?.id) {
-                    Get.find<MainBloc>().add(UpdateSessionIdEvent(
-                      oldId: item!.id,
-                      newId: newId,
-                    ));
+                () async {
+                  final newIdRaw = controller.text.trim();
+                  if (newIdRaw.isEmpty || newIdRaw == item?.id) {
+                    Navigator.pop(context);
+                    return;
                   }
-                  Navigator.pop(context);
+
+                  final parsed = TtIdParser.parse(newIdRaw);
+                  if (parsed == null) {
+                    await showErrorAlert(
+                      context,
+                      'Укажите код в формате УТ-…',
+                    );
+                    return;
+                  }
+
+                  final bloc = Get.find<MainBloc>();
+                  if (!bloc.state.isFree) {
+                    final catalog = Get.find<RoutersRepository>();
+                    if (TtIdParser.findInList(catalog.marketCenters, parsed) ==
+                        null) {
+                      await showErrorAlert(
+                        context,
+                        'ТТ $parsed не найдена в справочнике.',
+                      );
+                      return;
+                    }
+                  }
+
+                  final confirmed = await showTtStartConfirmation(
+                    context,
+                    ttId: parsed,
+                  );
+                  if (!confirmed) return;
+
+                  Get.find<MainBloc>().add(UpdateSessionIdEvent(
+                    oldId: item!.id,
+                    newId: parsed,
+                  ));
+                  if (context.mounted) {
+                    Navigator.pop(context);
+                  }
                 },
               );
             },

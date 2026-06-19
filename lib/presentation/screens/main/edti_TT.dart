@@ -4,7 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:gap/gap.dart';
 import 'package:get/get.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
+import 'package:tdtime/common/tt_id_parser.dart';
 import 'package:tdtime/common/utils.dart';
+import 'package:tdtime/domain/repository/routers_repository.dart';
 import 'package:tdtime/presentation/screens/main/bloc/main_bloc.dart';
 import 'package:tdtime/presentation/screens/scan/qr_code_scan.dart';
 import 'package:tdtime/presentation/theme/theme.dart';
@@ -21,6 +23,38 @@ class EditIdModal extends StatelessWidget {
     required this.currentId,
     required this.controller,
   });
+
+  Future<String?> _resolveNewId(BuildContext context, String raw) async {
+    final parsed = TtIdParser.parse(raw);
+    if (parsed == null) {
+      await showErrorAlert(
+        context,
+        'Не удалось распознать номер ТТ.\nУкажите код в формате УТ-…',
+      );
+      return null;
+    }
+
+    final bloc = Get.find<MainBloc>();
+    if (!bloc.state.isFree) {
+      final catalog = Get.find<RoutersRepository>();
+      final mc = TtIdParser.findInList(catalog.marketCenters, parsed);
+      if (mc == null) {
+        await showErrorAlert(
+          context,
+          'ТТ $parsed не найдена в справочнике.',
+        );
+        return null;
+      }
+    }
+
+    final confirmed = await showTtStartConfirmation(
+      context,
+      ttId: parsed,
+    );
+    if (!confirmed) return null;
+
+    return parsed;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -45,28 +79,31 @@ class EditIdModal extends StatelessWidget {
             text: 'Сканировать QR',
             iconPath: 'assets/svg/qr_code.svg',
             onPressed: () async {
-              late Barcode result;
-              await Navigator.push(
+              final scanResult = await Navigator.push<Barcode>(
                 context,
                 MaterialPageRoute(
                   builder: (context) => ScanScreen(
-                    onScan: (Barcode scanResult) {
-                      result = scanResult;
-                    },
+                    formats: kTtQrScanFormats,
+                    requireStableRead: true,
+                    title: 'Сканирование QR торговой точки',
+                    onScan: (_) {},
                   ),
                 ),
               );
 
-              if (result.rawValue != null) {
-                if (result.format != BarcodeFormat.dataMatrix) {
-                  Get.find<MainBloc>().add(UpdateSessionIdEvent(
-                    oldId: currentId,
-                    newId: result.rawValue!,
-                  ));
-                  if (context.mounted) {
-                    Navigator.of(context).pop();
-                  }
-                }
+              if (scanResult?.rawValue == null || !context.mounted) return;
+              if (scanResult!.format == BarcodeFormat.dataMatrix) return;
+
+              final newId =
+                  await _resolveNewId(context, scanResult.rawValue!);
+              if (newId == null || !context.mounted) return;
+
+              Get.find<MainBloc>().add(UpdateSessionIdEvent(
+                oldId: currentId,
+                newId: newId,
+              ));
+              if (context.mounted) {
+                Navigator.of(context).pop();
               }
             },
           ),
@@ -88,7 +125,6 @@ class EditIdModal extends StatelessWidget {
     );
   }
 
-  // Новый метод для отображения диалогового окна подтверждения
   Future<bool?> showDeleteConfirmationModal(BuildContext context, String id) {
     final Completer<bool?> completer = Completer<bool?>();
 
@@ -103,17 +139,16 @@ class EditIdModal extends StatelessWidget {
       ),
       () {
         Navigator.of(context).pop();
-        // Действие при отмене
-        completer.complete(false); // Возвращаем false
+        completer.complete(false);
       },
       () {
         Get.find<MainBloc>().add(DeleteMatrixEvent(id: id));
         Navigator.of(context).pop();
-        completer.complete(true); // Возвращаем true
+        completer.complete(true);
       },
       butText: 'Удалить',
     );
 
-    return completer.future; // Возвращаем Future
+    return completer.future;
   }
 }

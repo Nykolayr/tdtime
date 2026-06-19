@@ -1,5 +1,6 @@
 import 'package:get/get.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:tdtime/common/tt_id_parser.dart';
 import 'package:tdtime/data/api/api.dart';
 import 'package:tdtime/domain/models/market_center.dart';
 import 'package:tdtime/domain/models/session.dart';
@@ -123,7 +124,13 @@ class RoutersRepository {
 
   /// убираем выбранный ТЦ из списка точек на сегодня
   void removeMarketCenter(MarketCenter marketCenter) {
-    todayRouters.remove(marketCenter);
+    removeMarketCenterById(marketCenter.id);
+  }
+
+  /// Убирает ТТ из маршрута на сегодня по id (не по ссылке на объект).
+  void removeMarketCenterById(String id) {
+    if (id.isEmpty) return;
+    todayRouters.removeWhere((mc) => TtIdParser.idsMatch(mc.id, id));
     _saveTodayRouters();
   }
 

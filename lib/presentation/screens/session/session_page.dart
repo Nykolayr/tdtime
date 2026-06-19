@@ -183,11 +183,20 @@ class DataMatrixScanPageState extends State<DataMatrixScanPage> {
     });
 
     try {
-      // Сначала закрываем сессию в UserRepository
-      UserRepository userRepo = Get.find<UserRepository>();
-      await userRepo.closeSession();
+      final userRepo = Get.find<UserRepository>();
+      final message = await userRepo.closeSession();
+      if (message.isNotEmpty) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(message),
+              duration: const Duration(seconds: 5),
+            ),
+          );
+        }
+        return;
+      }
 
-      // Потом обновляем состояние в MainBloc
       bloc.add(CloseSessionEvent());
 
       await Future.delayed(const Duration(milliseconds: 100));
@@ -306,6 +315,12 @@ class DataMatrixScanPageState extends State<DataMatrixScanPage> {
             return true;
           },
           builder: (context, state) {
+            final lastSession = state.dayHystorySession.listSessions.isEmpty
+                ? null
+                : state.dayHystorySession.listSessions.last;
+            final canFinishSession =
+                lastSession != null && lastSession.hasScannedCodes;
+
             return Scaffold(
               extendBodyBehindAppBar: true,
               appBar: AppBars(
@@ -370,8 +385,23 @@ class DataMatrixScanPageState extends State<DataMatrixScanPage> {
                               ? 'Отправка данных...'
                               : 'Закончить сканирование в ТТ',
                           iconPath: 'assets/svg/exit.svg',
-                          onPressed: _isClosingSession ? () {} : _closeSession,
+                          isEnable: canFinishSession && !_isClosingSession,
+                          onPressed: _closeSession,
                         ),
+                        if (!canFinishSession && lastSession != null) ...[
+                          const Gap(8),
+                          SizedBox(
+                            width: MediaQuery.of(context).size.width - 40,
+                            child: Text(
+                              'Для завершения отсканируйте хотя бы один код '
+                              'или нажмите «Отменить сканирование ТТ».',
+                              style: AppText.text12.copyWith(
+                                color: AppColor.white.withValues(alpha: 0.85),
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                          ),
+                        ],
                         const Gap(20),
                         ButtonWide(
                           text: 'Отменить сканирование ТТ',

@@ -55,14 +55,16 @@ class BeginSessinonEvent extends MainEvent {
   final String id;
   final String sessionId;
   final Position position;
+  final MarketCenter? marketCenter;
   const BeginSessinonEvent({
     required this.id,
     required this.sessionId,
     required this.position,
+    this.marketCenter,
   });
 
   @override
-  List<Object> get props => [id, sessionId, position];
+  List<Object> get props => [id, sessionId, position, marketCenter?.id ?? ''];
 }
 
 /// добавление dataMatrix

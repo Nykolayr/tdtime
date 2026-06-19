@@ -3,16 +3,47 @@ import 'package:go_router/go_router.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:tdtime/presentation/widgets/app_bar.dart';
 
+/// Сканирование QR торговой точки: только QR, устойчивое чтение.
+const List<BarcodeFormat> kTtQrScanFormats = [BarcodeFormat.qrCode];
+
+const int kTtQrStableReadCount = 3;
+
+Barcode? pickPreferredBarcode(List<Barcode> barcodes) {
+  for (final barcode in barcodes) {
+    if (barcode.format == BarcodeFormat.qrCode &&
+        barcode.rawValue != null &&
+        barcode.rawValue!.trim().isNotEmpty) {
+      return barcode;
+    }
+  }
+  for (final barcode in barcodes) {
+    if (barcode.rawValue != null && barcode.rawValue!.trim().isNotEmpty) {
+      return barcode;
+    }
+  }
+  return null;
+}
+
 class ScanScreen extends StatefulWidget {
   final Function(Barcode) onScan;
 
   /// Если задано — сканируются только эти форматы; иначе QR + DataMatrix.
   final List<BarcodeFormat>? formats;
 
+  /// Требовать несколько одинаковых чтений подряд (для выбора ТТ).
+  final bool requireStableRead;
+
+  final int stableReadCount;
+
+  final String? title;
+
   const ScanScreen({
     super.key,
     required this.onScan,
     this.formats,
+    this.requireStableRead = false,
+    this.stableReadCount = kTtQrStableReadCount,
+    this.title,
   });
 
   @override
@@ -22,6 +53,9 @@ class ScanScreen extends StatefulWidget {
 class _ScanScreenState extends State<ScanScreen> with WidgetsBindingObserver {
   late final MobileScannerController controller;
   bool _isTorchOn = false;
+  bool _accepted = false;
+  String? _lastStableValue;
+  int _stableCount = 0;
 
   @override
   void initState() {
@@ -30,9 +64,8 @@ class _ScanScreenState extends State<ScanScreen> with WidgetsBindingObserver {
       formats: widget.formats ??
           const [BarcodeFormat.qrCode, BarcodeFormat.dataMatrix],
       detectionSpeed: DetectionSpeed.normal,
-      detectionTimeoutMs: 800,
+      detectionTimeoutMs: widget.requireStableRead ? 500 : 800,
     );
-    // для отслеживания changeLifecycle
     WidgetsBinding.instance.addObserver(this);
   }
 
@@ -58,38 +91,61 @@ class _ScanScreenState extends State<ScanScreen> with WidgetsBindingObserver {
     }
   }
 
+  Future<void> _handleDetect(Barcode barcode) async {
+    if (_accepted) return;
+
+    final raw = barcode.rawValue?.trim();
+    if (raw == null || raw.isEmpty) return;
+
+    if (widget.requireStableRead) {
+      if (raw == _lastStableValue) {
+        _stableCount++;
+      } else {
+        _lastStableValue = raw;
+        _stableCount = 1;
+      }
+      if (_stableCount < widget.stableReadCount) return;
+    }
+
+    _accepted = true;
+    await controller.stop();
+    widget.onScan(barcode);
+    if (context.mounted) {
+      Navigator.pop(context, barcode);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    final hint = widget.requireStableRead
+        ? 'Держите QR торговой точки в рамке'
+        : 'Поднесите код к прозрачному окну';
+
     return Scaffold(
-      appBar: const AppBars(title: 'Сканирование кода', isBack: true),
+      appBar: AppBars(
+        title: widget.title ?? 'Сканирование кода',
+        isBack: true,
+      ),
       body: Stack(
         children: [
-          // Камера и сканер
           MobileScanner(
             controller: controller,
             onDetect: (capture) async {
-              final List<Barcode> barcodes = capture.barcodes;
-              if (barcodes.isNotEmpty) {
-                final barcode = barcodes.first;
-                await controller.stop();
-                widget.onScan(barcode);
-                if (context.mounted) {
-                  Navigator.pop(context, barcode);
-                }
+              final barcode = pickPreferredBarcode(capture.barcodes);
+              if (barcode != null) {
+                await _handleDetect(barcode);
               }
             },
           ),
-          // Overlay с одной прозрачной областью
           const QRScannerOverlay(),
-          // Подсказка
-          const Positioned(
+          Positioned(
             bottom: 130,
             left: 0,
             right: 0,
             child: Center(
               child: Text(
-                'Поднесите код к прозрачному окну',
-                style: TextStyle(
+                hint,
+                style: const TextStyle(
                     color: Colors.white,
                     fontSize: 17,
                     fontWeight: FontWeight.w500,
@@ -98,7 +154,6 @@ class _ScanScreenState extends State<ScanScreen> with WidgetsBindingObserver {
               ),
             ),
           ),
-          // Кнопка фонарика
           Positioned(
             bottom: 50,
             left: 0,
@@ -144,20 +199,17 @@ class QRScannerOverlayPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    // Параметры окна сканирования
     const double windowWidth = 280;
     const double windowHeight = 280;
     const double cornerRadius = 22;
     const double strokeWidth = 4;
 
-    // Прямоугольник сканирования по центру экрана
     final Rect scanRect = Rect.fromCenter(
       center: Offset(size.width / 2, size.height / 2 - 20),
       width: windowWidth,
       height: windowHeight,
     );
 
-    // Затемняем всё, кроме окна (прозрачный «вырез»)
     final Path overlay = Path()..addRect(Offset.zero & size);
     final Path hole = Path()
       ..addRRect(RRect.fromRectAndRadius(
@@ -169,7 +221,6 @@ class QRScannerOverlayPainter extends CustomPainter {
       ..style = PaintingStyle.fill;
     canvas.drawPath(mask, dimPaint);
 
-    // Рисуем одну рамку (скруглённый прямоугольник)
     final Paint framePaint = Paint()
       ..color = Colors.white
       ..strokeWidth = strokeWidth
@@ -193,12 +244,15 @@ class QrScanPage extends StatefulWidget {
 
 class _QrScanPageState extends State<QrScanPage> with WidgetsBindingObserver {
   final MobileScannerController controller = MobileScannerController(
-    formats: const [BarcodeFormat.qrCode, BarcodeFormat.dataMatrix],
+    formats: kTtQrScanFormats,
     detectionSpeed: DetectionSpeed.normal,
-    detectionTimeoutMs: 800,
+    detectionTimeoutMs: 500,
   );
 
   bool _isTorchOn = false;
+  bool _accepted = false;
+  String? _lastStableValue;
+  int _stableCount = 0;
 
   @override
   void initState() {
@@ -228,22 +282,39 @@ class _QrScanPageState extends State<QrScanPage> with WidgetsBindingObserver {
     }
   }
 
+  Future<void> _handleDetect(Barcode barcode) async {
+    if (_accepted) return;
+
+    final raw = barcode.rawValue?.trim();
+    if (raw == null || raw.isEmpty) return;
+
+    if (raw == _lastStableValue) {
+      _stableCount++;
+    } else {
+      _lastStableValue = raw;
+      _stableCount = 1;
+    }
+    if (_stableCount < kTtQrStableReadCount) return;
+
+    _accepted = true;
+    await controller.stop();
+    if (context.mounted) {
+      context.pop(barcode);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: const AppBars(title: 'Сканирование кода', isBack: true),
+      appBar: const AppBars(title: 'Сканирование QR торговой точки', isBack: true),
       body: Stack(
         children: [
           MobileScanner(
             controller: controller,
             onDetect: (capture) async {
-              final List<Barcode> barcodes = capture.barcodes;
-              if (barcodes.isNotEmpty) {
-                final barcode = barcodes.first;
-                await controller.stop();
-                if (context.mounted) {
-                  context.pop(barcode);
-                }
+              final barcode = pickPreferredBarcode(capture.barcodes);
+              if (barcode != null) {
+                await _handleDetect(barcode);
               }
             },
           ),
@@ -254,7 +325,7 @@ class _QrScanPageState extends State<QrScanPage> with WidgetsBindingObserver {
             right: 0,
             child: Center(
               child: Text(
-                'Поднесите QR-код ближе к центру окна',
+                'Держите QR торговой точки в рамке',
                 style: TextStyle(
                     color: Colors.white,
                     fontSize: 17,

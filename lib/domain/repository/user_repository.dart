@@ -13,6 +13,10 @@ import 'package:tdtime/presentation/screens/main/bloc/main_bloc.dart';
 
 /// репо для юзера
 class UserRepository {
+  static const emptySessionCloseMessage =
+      'Нельзя завершить ТТ без отсканированных кодов. '
+      'Отсканируйте хотя бы один код или нажмите «Отменить сканирование ТТ».';
+
   User user = User.initial();
   String get id => user.id;
   bool get isReg => user.id.isNotEmpty;
@@ -107,7 +111,9 @@ class UserRepository {
     for (var day in hystorySessions) {
       List<SessionScan> unsentSessions = day.listSessions
           .where((session) =>
-              session.state == StateSession.close && !session.isUploaded)
+              session.state == StateSession.close &&
+              !session.isUploaded &&
+              session.hasScannedCodes)
           .toList();
 
       if (unsentSessions.isNotEmpty) {
@@ -124,6 +130,30 @@ class UserRepository {
     };
   }
 
+  bool _isSessionReadyForUpload(SessionScan session) =>
+      session.id.trim().isNotEmpty && session.hasScannedCodes;
+
+  Map<String, dynamic> _ftpPayloadFor(SessionScan session) => {
+        'FIO': '${user.family} ${user.name} ${user.patron}',
+        'ID': user.id,
+        'TT_INFO': session.toMapForFtp(),
+      };
+
+  String _ftpFileNameFor(SessionScan session) =>
+      '${session.id}_${session.time.microsecondsSinceEpoch}.json';
+
+  Future<String> _uploadSessionToFtp(SessionScan session) async {
+    if (!_isSessionReadyForUpload(session)) {
+      Logger.w(
+          'Пропуск выгрузки сессии ${session.id}: нет отсканированных кодов');
+      return '';
+    }
+    return Api().uploadHystorySessionsToFtp(
+      _ftpPayloadFor(session),
+      _ftpFileNameFor(session),
+    );
+  }
+
   /// Отправка всех неотправленных сессий для конкретного дня
   Future<String> uploadSessionsForDay(String dayKey) async {
     Logger.i('Отправка сессий для дня: $dayKey');
@@ -136,17 +166,11 @@ class UserRepository {
       String currentDayKey = day.getFormattedDateTime();
       if (currentDayKey == dayKey) {
         for (var session in day.listSessions) {
-          if (session.state == StateSession.close && !session.isUploaded) {
+          if (session.state == StateSession.close &&
+              !session.isUploaded &&
+              session.hasScannedCodes) {
             try {
-              String fileName =
-                  '${session.id}_${session.time.microsecondsSinceEpoch}.json';
-              Map<String, dynamic> data = {};
-              data['FIO'] = '${user.family} ${user.name} ${user.patron}';
-              data['ID'] = user.id;
-              data['TT_INFO'] = session.toMapForFtp();
-
-              String answer =
-                  await Api().uploadHystorySessionsToFtp(data, fileName);
+              final answer = await _uploadSessionToFtp(session);
               if (answer.isEmpty) {
                 session.isUploaded = true;
                 await _historyStore.persistSessionFlags(session);
@@ -222,29 +246,28 @@ class UserRepository {
 
   /// закрытие сессии
   Future<String> closeSession() async {
-    String fileName =
-        '${lastDay.listSessions.last.id}_${lastDay.listSessions.last.time.microsecondsSinceEpoch}.json';
-    Map<String, dynamic> data = {};
-    data['FIO'] = '${user.family} ${user.name} ${user.patron}';
-    data['ID'] = user.id;
-    data['TT_INFO'] = lastDay.listSessions.last.toMapForFtp();
-    Logger.i('data == $data');
-    Logger.i('fileName == $fileName');
+    if (lastDay.listSessions.isEmpty) {
+      return 'Нет активной сессии для завершения.';
+    }
 
-    // Пытаемся отправить на FTP сервер
-    String answer = await Api().uploadHystorySessionsToFtp(data, fileName);
+    final session = lastDay.listSessions.last;
+    if (!_isSessionReadyForUpload(session)) {
+      return emptySessionCloseMessage;
+    }
+
+    Logger.i('data == ${_ftpPayloadFor(session)}');
+    Logger.i('fileName == ${_ftpFileNameFor(session)}');
+
+    final answer = await _uploadSessionToFtp(session);
     Logger.i('answer == $answer');
 
-    // ВАЖНО: Сохраняем данные локально ВСЕГДА, независимо от результата FTP
-    lastDay.listSessions.last.state = StateSession.close;
+    session.state = StateSession.close;
 
-    // Отмечаем сессию как отправленную только если FTP успешен
     if (answer.isEmpty) {
-      lastDay.listSessions.last.isUploaded = true;
-      Logger.i(
-          'Сессия ${lastDay.listSessions.last.id} успешно отправлена на сервер');
+      session.isUploaded = true;
+      Logger.i('Сессия ${session.id} успешно отправлена на сервер');
     } else {
-      lastDay.listSessions.last.isUploaded = false;
+      session.isUploaded = false;
       Logger.w(
           'FTP загрузка не удалась, но данные сохранены локально: $answer');
     }
@@ -253,10 +276,9 @@ class UserRepository {
         'closeSession: после закрытия lastDay.listSessions.length = ${lastDay.listSessions.length}');
     Logger.i(
         'closeSession: после закрытия hystorySessions.last.listSessions.length = ${hystorySessions.last.listSessions.length}');
-    Logger.i('${lastDay.listSessions.last.toJson()}');
-    await _historyStore.persistSessionFlags(lastDay.listSessions.last);
+    Logger.i('${session.toJson()}');
+    await _historyStore.persistSessionFlags(session);
 
-    // Если была ошибка FTP, возвращаем сообщение об ошибке
     if (answer.isNotEmpty) {
       return 'Ошибка сохранения на сервер: $answer. Данные сохранены локально и будут отправлены позже.';
     }
@@ -285,17 +307,11 @@ class UserRepository {
 
     for (var day in hystorySessions) {
       for (var session in day.listSessions) {
-        if (session.state == StateSession.close && !session.isUploaded) {
+        if (session.state == StateSession.close &&
+            !session.isUploaded &&
+            session.hasScannedCodes) {
           try {
-            String fileName =
-                '${session.id}_${session.time.microsecondsSinceEpoch}.json';
-            Map<String, dynamic> data = {};
-            data['FIO'] = '${user.family} ${user.name} ${user.patron}';
-            data['ID'] = user.id;
-            data['TT_INFO'] = session.toMapForFtp();
-
-            String answer =
-                await Api().uploadHystorySessionsToFtp(data, fileName);
+            final answer = await _uploadSessionToFtp(session);
             if (answer.isEmpty) {
               session.isUploaded = true;
               await _historyStore.persistSessionFlags(session);
@@ -319,7 +335,7 @@ class UserRepository {
     int pending = 0;
 
     for (var session in lastDay.listSessions) {
-      if (session.state == StateSession.close) {
+      if (session.state == StateSession.close && session.hasScannedCodes) {
         totalClosed++;
         if (session.isUploaded) {
           uploaded++;
@@ -347,17 +363,11 @@ class UserRepository {
 
     for (var day in hystorySessions) {
       for (var session in day.listSessions) {
-        if (session.state == StateSession.close && !session.isUploaded) {
+        if (session.state == StateSession.close &&
+            !session.isUploaded &&
+            session.hasScannedCodes) {
           try {
-            String fileName =
-                '${session.id}_${session.time.microsecondsSinceEpoch}.json';
-            Map<String, dynamic> data = {};
-            data['FIO'] = '${user.family} ${user.name} ${user.patron}';
-            data['ID'] = user.id;
-            data['TT_INFO'] = session.toMapForFtp();
-
-            String answer =
-                await Api().uploadHystorySessionsToFtp(data, fileName);
+            final answer = await _uploadSessionToFtp(session);
             if (answer.isEmpty) {
               session.isUploaded = true;
               await _historyStore.persistSessionFlags(session);
@@ -418,10 +428,14 @@ class UserRepository {
 
   /// Добавление DataMatrix в сессию
   Future<String> addMatrix({required String id}) async {
-    if (hystorySessions.last.listSessions.last.dataMatrix.contains(id)) {
+    final code = id.trim();
+    if (code.isEmpty) {
+      return 'Пустой код сканирования';
+    }
+    if (hystorySessions.last.listSessions.last.dataMatrix.contains(code)) {
       return 'Этот DataMatrix вы уже сканировали!';
     }
-    hystorySessions.last.listSessions.last.dataMatrix.add(id);
+    hystorySessions.last.listSessions.last.dataMatrix.add(code);
     hystorySessions.last.state = StateSession.inwork;
     final day = hystorySessions.last;
     final session = day.listSessions.last;
@@ -432,7 +446,7 @@ class UserRepository {
         dayId: dayId,
         sessionDriftId: sid,
         sortIndex: session.dataMatrix.length - 1,
-        code: id,
+        code: code,
       );
     } else {
       Logger.e('addMatrix: нет drift id у дня или сессии');

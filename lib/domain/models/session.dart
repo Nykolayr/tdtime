@@ -76,6 +76,10 @@ class SessionScan {
     return '${time.day.toString().padLeft(2, '0')}.${time.month.toString().padLeft(2, '0')}.${time.year.toString().substring(2)}';
   }
 
+  /// Есть хотя бы один непустой отсканированный код.
+  bool get hasScannedCodes =>
+      dataMatrix.any((code) => code.trim().isNotEmpty);
+
   Map<String, dynamic> toMapForFtp() {
     return {
       'ID_TT': id,
