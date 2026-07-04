@@ -23,14 +23,11 @@
 
 ## Подпись release
 
-Сейчас в `android/app/build.gradle` release может быть на **debug**-ключе (см. `signingConfig = signingConfigs.debug`).  
-Для стора настроить один раз:
+1. `upload-keystore.jks` в `android/app/` (не в git)
+2. `android/key.properties` из `key.properties.example` (не в git)
+3. `android/app/build.gradle` — `signingConfigs.release`
 
-1. `upload-keystore.jks` в `android/app/`
-2. `android/key.properties` (не в git)
-3. `signingConfigs.release` в Gradle
-
-**Один keystore** для Google Play и RuStore.
+**Один keystore** для Google Play и RuStore. Сохраните копию `.jks` и пароли отдельно — без них обновления в сторе невозможны.
 
 ## Сборка и копирование (PowerShell)
 
@@ -40,7 +37,8 @@ $slug = "tdtime"
 # Подставить build из pubspec после +, например 31
 $build = 31
 
-# Если сборка падает на скачивании sqlite3 с GitHub — прекомпиляция в кэш hooks:
+# Если сборка падает на скачивании sqlite3 с GitHub — прекомпиляция в tool/:
+# (pubspec: hooks.user_defines.sqlite3.source = test-sqlite3, directory = tool/ — слэш обязателен)
 powershell -ExecutionPolicy Bypass -File tool\prefetch_sqlite_android.ps1
 
 flutter pub get

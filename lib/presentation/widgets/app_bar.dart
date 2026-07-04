@@ -8,11 +8,14 @@ class AppBars extends StatefulWidget implements PreferredSizeWidget {
   final String title;
   final bool isBack;
   final bool isLeft;
+  final VoidCallback? onBackPressed;
+
   const AppBars({
     super.key,
     this.title = '',
     this.isBack = true,
     this.isLeft = false,
+    this.onBackPressed,
   });
 
   @override
@@ -40,7 +43,8 @@ class _AppBarsState extends State<AppBars> {
                   Icons.chevron_left,
                   color: AppColor.white,
                 ),
-                onPressed: () => Navigator.pop(context, false),
+                onPressed: widget.onBackPressed ??
+                    () => Navigator.pop(context, false),
               )
             : null,
         backgroundColor: AppColor.blueFon,

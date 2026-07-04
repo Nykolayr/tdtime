@@ -14,7 +14,7 @@ publish_to: 'none' # Remove this line if you wish to publish it to pub.dev
 
 
 
-version: 1.0.31+31
+version: 1.0.33+33
 
 
 
@@ -98,6 +98,8 @@ dependencies:
 
   package_info_plus: ^9.0.1
 
+  device_info_plus: ^11.5.0
+
   geolocator: ^14.0.2
 
   ftpconnect: ^2.0.10
@@ -126,6 +128,11 @@ dev_dependencies:
 
   build_runner: ^2.13.1
 
+hooks:
+  user_defines:
+    sqlite3:
+      source: test-sqlite3
+      directory: tool/
 
 
 # flutter pub run flutter_launcher_icons:main
