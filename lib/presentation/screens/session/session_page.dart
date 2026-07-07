@@ -6,6 +6,7 @@ import 'package:flutter_easylogger/flutter_logger.dart';
 import 'package:gap/gap.dart';
 import 'package:get/get.dart';
 import 'package:go_router/go_router.dart';
+import 'package:tdtime/common/last_scan_log.dart';
 import 'package:tdtime/domain/models/port_matrix_device.dart';
 import 'package:tdtime/domain/repository/port_matrix_repository.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
@@ -185,19 +186,17 @@ class DataMatrixScanPageState extends State<DataMatrixScanPage> {
     try {
       final userRepo = Get.find<UserRepository>();
       final message = await userRepo.closeSession();
-      if (message.isNotEmpty) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(message),
-              duration: const Duration(seconds: 5),
-            ),
-          );
-        }
-        return;
-      }
 
       bloc.add(CloseSessionEvent());
+
+      if (message.isNotEmpty && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(message),
+            duration: const Duration(seconds: 5),
+          ),
+        );
+      }
 
       await Future.delayed(const Duration(milliseconds: 100));
       if (context.mounted) {
@@ -224,6 +223,8 @@ class DataMatrixScanPageState extends State<DataMatrixScanPage> {
         MaterialPageRoute(
           builder: (context) => ScanScreen(
             formats: const [BarcodeFormat.dataMatrix],
+            scanKind: ScanKind.dataMatrix,
+            ttId: bloc.state.curSession.id,
             onScan: (Barcode scanResult) {
               _cameraScanResult = scanResult;
             },
@@ -263,6 +264,8 @@ class DataMatrixScanPageState extends State<DataMatrixScanPage> {
         MaterialPageRoute(
           builder: (context) => ScanScreen(
             formats: const [BarcodeFormat.pdf417],
+            scanKind: ScanKind.pdf417,
+            ttId: bloc.state.curSession.id,
             onScan: (Barcode scanResult) {
               _cameraScanResult = scanResult;
             },
@@ -327,6 +330,7 @@ class DataMatrixScanPageState extends State<DataMatrixScanPage> {
                 title: 'ТТ ${state.curSession.id}',
                 isBack: false,
                 isLeft: true,
+                showLogButton: true,
               ),
               body: Stack(
                 children: [
@@ -351,12 +355,14 @@ class DataMatrixScanPageState extends State<DataMatrixScanPage> {
                         ButtonWide(
                           text: 'Сканировать DataMatrix',
                           iconPath: 'assets/svg/reader.svg',
+                          opaqueBackground: true,
                           onPressed: startScanning,
                         ),
                         const Gap(12),
                         ButtonWide(
                           text: 'Сканировать PDF417',
                           iconPath: 'assets/svg/reader.svg',
+                          opaqueBackground: true,
                           onPressed: startPdf417Scanning,
                         ),
                         const Gap(12),
@@ -367,6 +373,7 @@ class DataMatrixScanPageState extends State<DataMatrixScanPage> {
                                   ? 'Port Matrix подключен'
                                   : 'Портматрикс',
                           iconPath: 'assets/svg/reader.svg',
+                          opaqueBackground: true,
                           onPressed: _connectPortMatrix,
                         ),
                         const Gap(8),
@@ -386,6 +393,7 @@ class DataMatrixScanPageState extends State<DataMatrixScanPage> {
                               : 'Закончить сканирование в ТТ',
                           iconPath: 'assets/svg/exit.svg',
                           isEnable: canFinishSession && !_isClosingSession,
+                          opaqueBackground: true,
                           onPressed: _closeSession,
                         ),
                         if (!canFinishSession && lastSession != null) ...[
@@ -406,6 +414,7 @@ class DataMatrixScanPageState extends State<DataMatrixScanPage> {
                         ButtonWide(
                           text: 'Отменить сканирование ТТ',
                           iconPath: 'assets/svg/undo.svg',
+                          opaqueBackground: true,
                           onPressed: exitScanning,
                         ),
                         const Gap(10),

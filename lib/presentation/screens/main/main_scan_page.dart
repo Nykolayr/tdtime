@@ -6,6 +6,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:get/get.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
+import 'package:tdtime/common/last_scan_log.dart';
 import 'package:tdtime/common/tt_id_parser.dart';
 import 'package:tdtime/domain/models/hystory_sessions.dart';
 import 'package:tdtime/domain/models/market_center.dart';
@@ -328,6 +329,7 @@ class MainScanPageState extends State<MainScanPage> {
           formats: kTtQrScanFormats,
           requireStableRead: true,
           title: 'Сканирование QR торговой точки',
+          scanKind: ScanKind.ttQr,
           onScan: (_) {},
         ),
       ),
@@ -803,10 +805,11 @@ class MainScanPageState extends State<MainScanPage> {
         builder: (context, state) {
           return Scaffold(
             extendBodyBehindAppBar: true,
-            appBar: const AppBars(
+            appBar: AppBars(
               title: 'Сканирование',
               isBack: false,
               isLeft: true,
+              showLogButton: true,
             ),
             body: Stack(
               children: [

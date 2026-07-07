@@ -1,5 +1,6 @@
 import 'package:flutter_easylogger/flutter_logger.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import 'package:tdtime/common/last_scan_log.dart';
 import 'package:tdtime/data/api/api.dart';
 import 'package:tdtime/data/api/dio_client.dart';
 import 'package:tdtime/domain/repository/ftp_config_repository.dart';
@@ -14,6 +15,8 @@ import 'package:get/get.dart';
 
 /// внедряем зависимости
 Future initMain() async {
+  await LastScanLog.load();
+
   await Get.putAsync(() async {
     PackageInfo packageInfo = await PackageInfo.fromPlatform();
     return packageInfo;

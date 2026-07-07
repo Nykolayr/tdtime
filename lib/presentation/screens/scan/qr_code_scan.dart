@@ -7,6 +7,7 @@ import 'package:flutter_easylogger/flutter_logger.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:tdtime/common/camera_scan_diagnostics.dart';
+import 'package:tdtime/common/last_scan_log.dart';
 import 'package:tdtime/presentation/theme/theme.dart';
 import 'package:tdtime/presentation/widgets/app_bar.dart';
 
@@ -44,8 +45,6 @@ MobileScannerController createScanController({
     autoStart: !_isIos,
     formats: formats,
     facing: CameraFacing.back,
-    lensType: _isIos ? CameraLensType.normal : CameraLensType.any,
-    initialZoom: _isIos ? 1.0 : null,
     detectionSpeed: DetectionSpeed.normal,
     detectionTimeoutMs: requireStableRead ? 500 : 800,
   );
@@ -57,6 +56,8 @@ class ScanScreen extends StatelessWidget {
   final bool requireStableRead;
   final int stableReadCount;
   final String? title;
+  final ScanKind scanKind;
+  final String? ttId;
 
   const ScanScreen({
     super.key,
@@ -65,6 +66,8 @@ class ScanScreen extends StatelessWidget {
     this.requireStableRead = false,
     this.stableReadCount = kTtQrStableReadCount,
     this.title,
+    this.scanKind = ScanKind.dataMatrix,
+    this.ttId,
   });
 
   @override
@@ -79,6 +82,8 @@ class ScanScreen extends StatelessWidget {
           ? 'Держите QR торговой точки в рамке'
           : 'Поднесите код к прозрачному окну',
       onScan: onScan,
+      scanKind: scanKind,
+      ttId: ttId,
     );
   }
 }
@@ -96,6 +101,7 @@ class QrScanPage extends StatelessWidget {
       hint: 'Держите QR торговой точки в рамке',
       onScan: (_) {},
       popWithGoRouter: true,
+      scanKind: ScanKind.ttQr,
     );
   }
 }
@@ -108,6 +114,8 @@ class _ScanCameraScreen extends StatefulWidget {
   final String hint;
   final Function(Barcode) onScan;
   final bool popWithGoRouter;
+  final ScanKind scanKind;
+  final String? ttId;
 
   const _ScanCameraScreen({
     required this.title,
@@ -117,6 +125,8 @@ class _ScanCameraScreen extends StatefulWidget {
     required this.hint,
     required this.onScan,
     this.popWithGoRouter = false,
+    this.scanKind = ScanKind.dataMatrix,
+    this.ttId,
   });
 
   @override
@@ -125,22 +135,38 @@ class _ScanCameraScreen extends StatefulWidget {
 
 class _ScanCameraScreenState extends State<_ScanCameraScreen> {
   late final MobileScannerController _controller;
+  late final DateTime _openedAt;
+  Timer? _snapshotTimer;
+  String _cameraSnapshotOpen = '—';
+  String _cameraSnapshot2s = '—';
   bool _isTorchOn = false;
   bool _accepted = false;
   bool _cameraReleased = false;
   bool _diagnosticsShown = false;
   bool _isClosing = false;
+  bool _logSaved = false;
   String? _lastStableValue;
   int _stableCount = 0;
 
   @override
   void initState() {
     super.initState();
+    _openedAt = DateTime.now();
     _controller = createScanController(
       formats: widget.formats,
       requireStableRead: widget.requireStableRead,
     );
     _controller.addListener(_onCameraStateChanged);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _cameraSnapshotOpen =
+          LastScanLog.snapshotCamera(_controller, 'открытие');
+    });
+    _snapshotTimer = Timer(const Duration(seconds: 2), () {
+      if (!mounted) return;
+      _cameraSnapshot2s =
+          LastScanLog.snapshotCamera(_controller, '+2 сек');
+    });
     if (_isIos) {
       _scheduleIosCameraStart();
     }
@@ -148,7 +174,11 @@ class _ScanCameraScreenState extends State<_ScanCameraScreen> {
 
   @override
   void dispose() {
+    _snapshotTimer?.cancel();
     _controller.removeListener(_onCameraStateChanged);
+    if (!_logSaved) {
+      unawaited(_saveScanLog(result: ScanLogResult.cancelled));
+    }
     unawaited(_stopCamera());
     _controller.dispose();
     super.dispose();
@@ -204,9 +234,44 @@ class _ScanCameraScreenState extends State<_ScanCameraScreen> {
     }
   }
 
+  Future<void> _saveScanLog({
+    required ScanLogResult result,
+    Barcode? barcode,
+  }) async {
+    if (_logSaved) return;
+    _logSaved = true;
+    final error = _controller.value.error;
+    await LastScanLog.recordScan(
+      scanKind: widget.scanKind,
+      openedAt: _openedAt,
+      closedAt: DateTime.now(),
+      result: result,
+      controller: _controller,
+      formats: widget.formats,
+      screenTitle: widget.title,
+      ttId: widget.ttId,
+      scannedCode: barcode?.rawValue,
+      barcodeFormat: barcode?.format.name,
+      errorMessage: error?.errorDetails?.message ?? error?.errorCode.message,
+      cameraSnapshotOpen: _cameraSnapshotOpen,
+      cameraSnapshot2s: _cameraSnapshot2s,
+      cameraSnapshotClose:
+          LastScanLog.snapshotCamera(_controller, 'закрытие'),
+    );
+  }
+
   Future<void> _closeScreen([Object? result]) async {
     if (_isClosing) return;
     _isClosing = true;
+    if (!_logSaved) {
+      if (result is Barcode) {
+        await _saveScanLog(result: ScanLogResult.success, barcode: result);
+      } else if (_controller.value.error != null) {
+        await _saveScanLog(result: ScanLogResult.error);
+      } else {
+        await _saveScanLog(result: ScanLogResult.cancelled);
+      }
+    }
     await _stopCamera();
     if (!mounted) return;
     if (widget.popWithGoRouter) {

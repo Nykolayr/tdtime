@@ -11,13 +11,17 @@ class ButtonWide extends StatelessWidget {
   final String iconPath;
   final bool isNext;
   final bool isEnable;
-  const ButtonWide(
-      {required this.text,
-      required this.onPressed,
-      this.isNext = false,
-      this.iconPath = '',
-      this.isEnable = true,
-      super.key});
+  final bool opaqueBackground;
+
+  const ButtonWide({
+    required this.text,
+    required this.onPressed,
+    this.isNext = false,
+    this.iconPath = '',
+    this.isEnable = true,
+    this.opaqueBackground = false,
+    super.key,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -32,7 +36,9 @@ class ButtonWide extends StatelessWidget {
               width: MediaQuery.of(context).size.width - 50,
               height: 50,
               decoration: BoxDecoration(
-                color: AppColor.black.withValues(alpha: 0.2),
+                color: opaqueBackground
+                    ? AppColor.blueFon2
+                    : AppColor.black.withValues(alpha: 0.2),
                 border: AppDif.borderAll,
                 borderRadius: AppDif.borderRadius10,
               ),

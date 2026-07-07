@@ -1,14 +1,15 @@
-import 'package:tdtime/presentation/screens/main/bloc/main_bloc.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:get/get.dart';
-import '../theme/theme.dart';
-
+import 'package:tdtime/presentation/screens/main/bloc/main_bloc.dart';
+import 'package:tdtime/presentation/screens/scan/scan_log_page.dart';
+import 'package:tdtime/presentation/theme/theme.dart';
 class AppBars extends StatefulWidget implements PreferredSizeWidget {
   final String title;
   final bool isBack;
   final bool isLeft;
   final VoidCallback? onBackPressed;
+  final bool showLogButton;
 
   const AppBars({
     super.key,
@@ -16,6 +17,7 @@ class AppBars extends StatefulWidget implements PreferredSizeWidget {
     this.isBack = true,
     this.isLeft = false,
     this.onBackPressed,
+    this.showLogButton = false,
   });
 
   @override
@@ -48,6 +50,21 @@ class _AppBarsState extends State<AppBars> {
               )
             : null,
         backgroundColor: AppColor.blueFon,
+        actions: widget.showLogButton
+            ? [
+                IconButton(
+                  icon: const Icon(Icons.article_outlined, color: AppColor.white),
+                  tooltip: 'Лог сканирования',
+                  onPressed: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (_) => const ScanLogPage(),
+                      ),
+                    );
+                  },
+                ),
+              ]
+            : null,
       ),
     );
   }
