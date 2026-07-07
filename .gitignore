@@ -5,9 +5,11 @@
 *.swp
 .DS_Store
 .atom/
+.build/
 .buildlog/
 .history
 .svn/
+.swiftpm/
 migrate_working_dir/
 
 # IntelliJ related
@@ -47,4 +49,6 @@ app.*.map.json
 
 # Временные бинарники sqlite3 (скачиваются в кэш hooks)
 tool/*.android.so
+tool/*.ios.dylib
+tool/*.ios_sim.dylib
 tool/_uri_test.dart
