@@ -146,10 +146,17 @@ class UserRepository {
     if (!_isSessionReadyForUpload(session)) {
       Logger.w(
           'Пропуск выгрузки сессии ${session.id}: нет отсканированных кодов');
-      return '';
+      // Не '' — иначе вызывающие пометили бы сессию как успешно отправленную.
+      return 'Пропуск: нет кодов для выгрузки';
+    }
+    final payload = _ftpPayloadFor(session);
+    final codes = (payload['TT_INFO'] as Map)['DataMatrix'] as List?;
+    if (codes == null || codes.isEmpty) {
+      Logger.w('Пропуск выгрузки сессии ${session.id}: пустой DataMatrix');
+      return 'Пропуск: пустой DataMatrix';
     }
     return Api().uploadHystorySessionsToFtp(
-      _ftpPayloadFor(session),
+      payload,
       _ftpFileNameFor(session),
     );
   }
@@ -244,7 +251,8 @@ class UserRepository {
     return '';
   }
 
-  /// закрытие сессии
+  /// закрытие сессии.
+  /// Offline-first: сначала локально закрываем ТТ, FTP — лучшая попытка, не блокер.
   Future<String> closeSession() async {
     if (lastDay.listSessions.isEmpty) {
       return 'Нет активной сессии для завершения.';
@@ -255,38 +263,39 @@ class UserRepository {
       return emptySessionCloseMessage;
     }
 
-    Logger.i('data == ${_ftpPayloadFor(session)}');
-    Logger.i('fileName == ${_ftpFileNameFor(session)}');
-
-    final answer = await _uploadSessionToFtp(session);
-    Logger.i('answer == $answer');
-
+    // 1) Локально закрываем сразу — пользователь не должен зависеть от FTP.
     session.state = StateSession.close;
+    session.isUploaded = false;
+    await _historyStore.persistSessionFlags(session);
+    Logger.i(
+        'closeSession: ТТ ${session.id} закрыта локально, пробуем FTP...');
+
+    // 2) Попытка выгрузки; любой сбой — только инфо, сессия уже закрыта.
+    String answer = '';
+    try {
+      answer = await _uploadSessionToFtp(session)
+          .timeout(const Duration(seconds: 12), onTimeout: () {
+        return 'FTP: таймаут 12 сек';
+      });
+    } catch (e) {
+      answer = e.toString();
+      Logger.e('closeSession: FTP исключение: $e');
+    }
 
     if (answer.isEmpty) {
       session.isUploaded = true;
+      await _historyStore.persistSessionFlags(session);
       Logger.i('Сессия ${session.id} успешно отправлена на сервер');
-    } else {
-      session.isUploaded = false;
-      Logger.w(
-          'FTP загрузка не удалась, но данные сохранены локально: $answer');
+      return '';
     }
 
-    Logger.i(
-        'closeSession: после закрытия lastDay.listSessions.length = ${lastDay.listSessions.length}');
-    Logger.i(
-        'closeSession: после закрытия hystorySessions.last.listSessions.length = ${hystorySessions.last.listSessions.length}');
-    Logger.i('${session.toJson()}');
-    await _historyStore.persistSessionFlags(session);
-
-    if (answer.isNotEmpty) {
-      return 'Ошибка сохранения на сервер: $answer. Данные сохранены локально и будут отправлены позже.';
-    }
-
-    return '';
+    Logger.w(
+        'FTP загрузка не удалась, данные сохранены локально: $answer');
+    return 'Сохранено на устройстве. На сервер отправим при связи.';
   }
 
-  /// закрытие дня
+  /// закрытие дня.
+  /// Неотправленные сессии не блокируют: день закрываем локально, retry — best effort.
   Future<String> closeDay() async {
     lastDay.state = StateSession.close;
     final did = lastDay.driftDayRowId;
@@ -294,10 +303,12 @@ class UserRepository {
       await _historyStore.updateDayState(did, StateSession.close);
     }
 
-    // Пытаемся повторно отправить все неотправленные сессии
-    await _retryFailedUploads();
+    try {
+      await _retryFailedUploads().timeout(const Duration(seconds: 15));
+    } catch (e) {
+      Logger.w('closeDay: retry выгрузки прерван/ошибка: $e');
+    }
 
-    await Future.delayed(const Duration(seconds: 1));
     return '';
   }
 

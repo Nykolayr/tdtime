@@ -396,6 +396,8 @@ class MainBloc extends Bloc<MainEvent, MainState> {
     // Проверяем, все ли ТТ обработаны
     bool isTotalDay = newCompletedTT >= state.totalTT;
 
+    final unsentData = repo.getAllUnsentSessions();
+
     emit(state.copyWith(
       dayHystorySession: repo.lastDay,
       curSession: repo.lastDay.listSessions.isNotEmpty
@@ -406,6 +408,9 @@ class MainBloc extends Bloc<MainEvent, MainState> {
       unsentTT: newUnsentTT,
       isTotalDay: isTotalDay,
       shouldShowDaySelection: false, // Скрываем выбор дня после первой ТТ
+      unsentSessions:
+          unsentData['unsentByDay'] as Map<String, List<SessionScan>>,
+      hasUnsentSessions: unsentData['hasUnsent'] as bool,
       // Если все ТТ завершены, показываем сообщение о завершении (только в режиме роутеров)
       error:
           (isTotalDay && !state.isFree) ? 'Все торговые точки обработаны!' : '',

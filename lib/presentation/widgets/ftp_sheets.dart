@@ -9,15 +9,15 @@ import 'package:tdtime/presentation/theme/theme.dart';
 import 'package:tdtime/presentation/widgets/buttons.dart';
 import 'package:restart_app/restart_app.dart';
 
-/// Шторка: FTP недоступен — только «ОК», ведёт в настройки (профиль).
+/// Шторка: FTP недоступен — можно продолжить offline.
 Future<void> showFtpUnavailableSheet({
   required BuildContext context,
   required VoidCallback onGoToSettings,
 }) {
   return showModalBottomSheet<void>(
     context: context,
-    isDismissible: false,
-    enableDrag: false,
+    isDismissible: true,
+    enableDrag: true,
     backgroundColor: Colors.transparent,
     builder: (ctx) {
       return Container(
@@ -42,9 +42,10 @@ Future<void> showFtpUnavailableSheet({
             ),
             const Gap(16),
             Text(
-              'Не удалось подключиться к FTP-серверу. Проверьте интернет и параметры сервера. '
-              'Чтобы указать другой адрес, логин и пароль, откройте раздел «Настройки» (профиль). '
-              'Без рабочего FTP приложение не сможет загружать маршруты.',
+              'Сейчас нет связи с сервером. Можно работать дальше: '
+              'сканы сохраняются на устройстве и отправятся при связи. '
+              'Маршруты — из локального кэша или свободный режим. '
+              'Параметры FTP можно проверить в «Настройках».',
               style: AppText.text14.copyWith(
                 color: AppColor.white.withValues(alpha: 0.9),
                 height: 1.35,
@@ -52,8 +53,18 @@ Future<void> showFtpUnavailableSheet({
             ),
             const Gap(24),
             ButtonWide(
-              text: 'ОК',
+              text: 'Продолжить работу',
+              iconPath: '',
+              opaqueBackground: true,
+              onPressed: () {
+                Navigator.of(ctx).pop();
+              },
+            ),
+            const Gap(12),
+            ButtonWide(
+              text: 'Открыть настройки FTP',
               iconPath: 'assets/svg/settings.svg',
+              opaqueBackground: true,
               onPressed: () {
                 Navigator.of(ctx).pop();
                 onGoToSettings();

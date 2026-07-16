@@ -81,12 +81,16 @@ class SessionScan {
       dataMatrix.any((code) => code.trim().isNotEmpty);
 
   Map<String, dynamic> toMapForFtp() {
+    final codes = dataMatrix
+        .map((c) => c.trim())
+        .where((c) => c.isNotEmpty)
+        .toList();
     return {
       'ID_TT': id,
       'GPRS': '${position.latitude},${position.longitude}',
       'DATE_TIME':
           '${time.day.toString().padLeft(2, '0')}.${time.month.toString().padLeft(2, '0')}.${time.year} ${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}',
-      'DataMatrix': dataMatrix,
+      'DataMatrix': codes,
     };
   }
 }

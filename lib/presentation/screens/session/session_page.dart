@@ -177,7 +177,8 @@ class DataMatrixScanPageState extends State<DataMatrixScanPage> {
     _closeSessionAsync();
   }
 
-  /// Асинхронное закрытие сессии
+  /// Асинхронное закрытие сессии.
+  /// FTP/интернет не блокируют выход: сначала локальное закрытие, потом уход с экрана.
   void _closeSessionAsync() async {
     setState(() {
       _isClosingSession = true;
@@ -189,19 +190,20 @@ class DataMatrixScanPageState extends State<DataMatrixScanPage> {
 
       bloc.add(CloseSessionEvent());
 
-      if (message.isNotEmpty && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+      // PopScope(canPop: false) блокирует GoRouter.pop — уходим через go.
+      if (!mounted) return;
+      final messenger = ScaffoldMessenger.maybeOf(context);
+      final info = message;
+      context.go('/main');
+
+      if (info.isNotEmpty) {
+        messenger?.showSnackBar(
           SnackBar(
-            content: Text(message),
-            duration: const Duration(seconds: 5),
+            content: Text(info),
+            duration: const Duration(seconds: 4),
+            backgroundColor: AppColor.blueFon2,
           ),
         );
-      }
-
-      await Future.delayed(const Duration(milliseconds: 100));
-      if (context.mounted) {
-        // ignore: use_build_context_synchronously
-        GoRouter.of(context).pop();
       }
     } finally {
       if (mounted) {
@@ -299,7 +301,8 @@ class DataMatrixScanPageState extends State<DataMatrixScanPage> {
     bloc.add(UndoMatrixEvent());
 
     if (context.mounted) {
-      GoRouter.of(context).pop();
+      // PopScope(canPop: false) блокирует pop — уходим через go.
+      context.go('/main');
     }
   }
 
@@ -389,7 +392,7 @@ class DataMatrixScanPageState extends State<DataMatrixScanPage> {
                         const Gap(20),
                         ButtonWide(
                           text: _isClosingSession
-                              ? 'Отправка данных...'
+                              ? 'Завершение...'
                               : 'Закончить сканирование в ТТ',
                           iconPath: 'assets/svg/exit.svg',
                           isEnable: canFinishSession && !_isClosingSession,

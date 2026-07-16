@@ -10,6 +10,8 @@ import 'package:tdtime/domain/repository/ftp_config_repository.dart';
 import 'package:flutter_easylogger/flutter_logger.dart' as logger;
 
 class Api {
+  static const Duration _ftpTimeout = Duration(seconds: 12);
+
   Future<FtpCredentials> _credentials() async {
     return Get.find<FtpConfigRepository>().getCredentials();
   }
@@ -26,11 +28,11 @@ class Api {
     );
     try {
       await ftpConnect.connect().timeout(
-        const Duration(seconds: 10),
+        _ftpTimeout,
         onTimeout: () {
           throw TimeoutException(
-            'FTP подключение превысило таймаут 10 секунд',
-            const Duration(seconds: 10),
+            'FTP подключение превысило таймаут ${_ftpTimeout.inSeconds} секунд',
+            _ftpTimeout,
           );
         },
       );
@@ -45,25 +47,25 @@ class Api {
     }
   }
 
-  /// выгрузка сессии
+  /// выгрузка сессии — никогда не зависает дольше [_ftpTimeout].
+  /// Пустой DataMatrix на FTP не отправляется.
   Future<String> uploadHystorySessionsToFtp(
       Map<String, dynamic> data, String fileName) async {
+    final ttInfo = data['TT_INFO'];
+    final codes = ttInfo is Map ? ttInfo['DataMatrix'] : null;
+    final hasCodes = codes is List &&
+        codes.any((c) => c != null && c.toString().trim().isNotEmpty);
+    if (!hasCodes) {
+      logger.Logger.w(
+          'uploadHystorySessionsToFtp: отказ — пустой DataMatrix, файл $fileName не создаём');
+      return 'Отказ: пустой DataMatrix, файл не отправлен';
+    }
+
     final jsonData = jsonEncode(data);
     final c = await _credentials();
     logger.Logger.i('data == $jsonData');
     logger.Logger.i('fileName == $fileName');
     logger.Logger.i('Подключение к FTP: ${c.host} с пользователем ${c.login}');
-
-    try {
-      final result = await InternetAddress.lookup('google.com');
-      if (result.isEmpty || result[0].rawAddress.isEmpty) {
-        return 'Нет подключения к интернету';
-      }
-      logger.Logger.i('Интернет-соединение доступно');
-    } catch (e) {
-      logger.Logger.e('Нет интернет-соединения: $e');
-      return 'Нет подключения к интернету: $e';
-    }
 
     final ftpConnect = FTPConnect(
       c.host,
@@ -75,29 +77,39 @@ class Api {
     );
 
     try {
-      logger.Logger.i('Подключение к FTP серверу...');
+      return await () async {
+        logger.Logger.i('Подключение к FTP серверу...');
 
-      await ftpConnect.connect().timeout(
-        const Duration(seconds: 10),
-        onTimeout: () {
-          throw TimeoutException('FTP подключение превысило таймаут 10 секунд',
-              const Duration(seconds: 10));
-        },
-      );
-      logger.Logger.i('Успешное подключение к FTP!');
+        await ftpConnect.connect().timeout(
+          _ftpTimeout,
+          onTimeout: () {
+            throw TimeoutException(
+              'FTP подключение превысило таймаут ${_ftpTimeout.inSeconds} секунд',
+              _ftpTimeout,
+            );
+          },
+        );
+        logger.Logger.i('Успешное подключение к FTP!');
 
-      final directory = await getTemporaryDirectory();
-      final tempFile = File('${directory.path}/$fileName');
-      await tempFile.writeAsString(jsonEncode(data));
+        final directory = await getTemporaryDirectory();
+        final tempFile = File('${directory.path}/$fileName');
+        await tempFile.writeAsString(jsonEncode(data));
 
-      ftpConnect.supportIPV6 = true;
-      await ftpConnect.changeDirectory('user_app');
-      await ftpConnect.uploadFile(tempFile);
-      logger.Logger.i('Файл успешно загружен на FTP!');
+        ftpConnect.supportIPV6 = true;
+        await ftpConnect.changeDirectory('user_app').timeout(_ftpTimeout);
+        await ftpConnect.uploadFile(tempFile).timeout(_ftpTimeout);
+        logger.Logger.i('Файл успешно загружен на FTP!');
 
-      await ftpConnect.disconnect();
-      await tempFile.delete();
-      return '';
+        await ftpConnect.disconnect();
+        await tempFile.delete();
+        return '';
+      }()
+          .timeout(_ftpTimeout, onTimeout: () {
+        throw TimeoutException(
+          'FTP операция превысила таймаут ${_ftpTimeout.inSeconds} секунд',
+          _ftpTimeout,
+        );
+      });
     } catch (e) {
       logger.Logger.e('Ошибка FTP подключения: $e');
       try {
@@ -110,66 +122,78 @@ class Api {
   Future<void> uploadJsonFile(
       String fileName, Map<String, dynamic> jsonData) async {
     final c = await _credentials();
+    final ftpConnect = FTPConnect(
+      c.host,
+      user: c.login,
+      pass: c.password,
+      securityType: SecurityType.ftp,
+    );
+
     try {
-      final ftpConnect = FTPConnect(
-        c.host,
-        user: c.login,
-        pass: c.password,
-        securityType: SecurityType.ftp,
-      );
+      await () async {
+        await ftpConnect.connect();
 
-      await ftpConnect.connect();
+        final directory = await getTemporaryDirectory();
+        final tempFile = File('${directory.path}/$fileName');
+        await tempFile.writeAsString(jsonEncode(jsonData));
 
-      final directory = await getTemporaryDirectory();
-      final tempFile = File('${directory.path}/$fileName');
-      await tempFile.writeAsString(jsonEncode(jsonData));
+        ftpConnect.supportIPV6 = true;
+        await ftpConnect.changeDirectory('user_app');
 
-      ftpConnect.supportIPV6 = true;
-      await ftpConnect.changeDirectory('user_app');
+        try {
+          await ftpConnect.makeDirectory('routes');
+        } catch (e) {
+          logger.Logger.e('Ошибка при создании директории routes: $e');
+        }
 
-      try {
-        await ftpConnect.makeDirectory('routes');
-      } catch (e) {
-        logger.Logger.e('Ошибка при создании директории routes: $e');
-      }
+        await ftpConnect.changeDirectory('routes');
+        await ftpConnect.uploadFile(tempFile);
 
-      await ftpConnect.changeDirectory('routes');
-      await ftpConnect.uploadFile(tempFile);
-
-      await ftpConnect.disconnect();
-      await tempFile.delete();
+        await ftpConnect.disconnect();
+        await tempFile.delete();
+      }()
+          .timeout(_ftpTimeout);
     } catch (e) {
       logger.Logger.e('Ошибка при загрузке JSON файла: $e');
+      try {
+        await ftpConnect.disconnect();
+      } catch (_) {}
       rethrow;
     }
   }
 
   Future<Map<String, dynamic>> downloadJsonFile(String fileName) async {
     final c = await _credentials();
+    final ftpConnect = FTPConnect(
+      c.host,
+      user: c.login,
+      pass: c.password,
+      securityType: SecurityType.ftp,
+    );
+
     try {
-      final ftpConnect = FTPConnect(
-        c.host,
-        user: c.login,
-        pass: c.password,
-        securityType: SecurityType.ftp,
-      );
+      return await () async {
+        await ftpConnect.connect();
+        ftpConnect.supportIPV6 = true;
+        await ftpConnect.changeDirectory('user_app');
+        await ftpConnect.changeDirectory('routes');
+        final directory = await getTemporaryDirectory();
+        final tempFile = File('${directory.path}/$fileName');
+        await tempFile.create();
 
-      await ftpConnect.connect();
-      ftpConnect.supportIPV6 = true;
-      await ftpConnect.changeDirectory('user_app');
-      await ftpConnect.changeDirectory('routes');
-      final directory = await getTemporaryDirectory();
-      final tempFile = File('${directory.path}/$fileName');
-      await tempFile.create();
+        await ftpConnect.downloadFile(fileName, tempFile);
+        final jsonString = await tempFile.readAsString();
+        await tempFile.delete();
 
-      await ftpConnect.downloadFile(fileName, tempFile);
-      final jsonString = await tempFile.readAsString();
-      await tempFile.delete();
-
-      await ftpConnect.disconnect();
-      return jsonDecode(jsonString) as Map<String, dynamic>;
+        await ftpConnect.disconnect();
+        return jsonDecode(jsonString) as Map<String, dynamic>;
+      }()
+          .timeout(_ftpTimeout);
     } catch (e) {
       logger.Logger.e('Ошибка при скачивании JSON файла: $e');
+      try {
+        await ftpConnect.disconnect();
+      } catch (_) {}
       return {'error': 'Ошибка при скачивании JSON файла $fileName: $e'};
     }
   }

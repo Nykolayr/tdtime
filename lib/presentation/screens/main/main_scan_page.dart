@@ -977,10 +977,10 @@ class MainScanPageState extends State<MainScanPage> {
     );
   }
 
-  /// Кнопка закрытия рабочего дня
+  /// Кнопка закрытия рабочего дня.
+  /// Неотправленные посещения не блокируют закрытие — уйдут при связи.
   Widget _buildCloseDayButton(MainState state) {
-    // Используем hasUnsentSessions из state, который учитывает все неотправленные сессии
-    bool hasUnsentSessions = state.hasUnsentSessions;
+    final hasUnsentSessions = state.hasUnsentSessions;
 
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -988,25 +988,21 @@ class MainScanPageState extends State<MainScanPage> {
         ButtonWide(
           text: 'Закрыть рабочий день',
           iconPath: 'assets/svg/reader.svg',
-          onPressed: hasUnsentSessions
-              ? () {
-                  // Кнопка заблокирована из-за неотправленных сессий
-                }
-              : () {
-                  bloc.add(ClosedayEvent());
-                },
-          isEnable:
-              !hasUnsentSessions, // Делаем кнопку недоступной если есть неотправленные
+          onPressed: () {
+            bloc.add(ClosedayEvent());
+          },
+          isEnable: true,
         ),
         if (hasUnsentSessions) ...[
           const Gap(8),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 10),
             child: Text(
-              'Закрыть рабочий день нельзя\nиз-за неотправленных посещений',
-              style: AppText.text12.copyWith(color: AppColor.redError),
+              'Есть неотправленные посещения — закроем день локально,\n'
+              'на сервер отправим при связи',
+              style: AppText.text12.copyWith(color: AppColor.yellow),
               textAlign: TextAlign.center,
-              maxLines: 2,
+              maxLines: 3,
               overflow: TextOverflow.visible,
             ),
           ),
